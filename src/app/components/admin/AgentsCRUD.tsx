@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Search, ChevronLeft, User, Save } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, ChevronLeft, User, Save, Mail } from 'lucide-react';
+import * as api from '../../api';
 import { Agent, AVATAR_COLORS } from '../../types';
 import { Pagination } from '../shared/Pagination';
 import { AdminRoute } from './AdminApp';
@@ -36,13 +37,16 @@ function PageHeader({ title, sub, back, onBack }: { title: string; sub?: string;
 }
 
 function FormPage({
-  title, back, initial, onSubmit, navigate,
+  title, back, initial, onSubmit, navigate, agentId,
 }: {
   title: string; back: string; initial: Omit<Agent, 'id' | 'createdAt'>;
   onSubmit: (f: Omit<Agent, 'id' | 'createdAt'>) => void;
   navigate: (r: AdminRoute) => void;
+  agentId?: string;
 }) {
   const [form, setForm] = useState(initial);
+  const [emailMsg, setEmailMsg] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
   const f = (k: keyof typeof form, v: string | boolean) => setForm(p => ({ ...p, [k]: v }));
 
   const Field = ({ label, req, children }: { label: string; req?: boolean; children: React.ReactNode }) => (
@@ -72,7 +76,30 @@ function FormPage({
           </div>
           <Field label="Service / Département" req><Input value={form.department} onChange={e => f('department', e.target.value)} placeholder="Direction RH" /></Field>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Email"><Input type="email" value={form.email} onChange={e => f('email', e.target.value)} placeholder="m.dubois@mairie.fr" /></Field>
+            <Field label="Email">
+              <Input type="email" value={form.email} onChange={e => f('email', e.target.value)} placeholder="m.dubois@mairie.fr" />
+              {agentId && form.email && (
+                <button type="button" disabled={sendingEmail}
+                  onClick={async () => {
+                    setSendingEmail(true);
+                    setEmailMsg('');
+                    try {
+                      const r = await api.resendAgentSetupEmail(agentId);
+                      setEmailMsg(r.emailed ? `Email d'activation envoyé à ${r.email}` : 'Compte mis à jour (vérifiez la config SMTP du serveur).');
+                    } catch (err) {
+                      setEmailMsg(err instanceof Error ? err.message : 'Erreur envoi email');
+                    } finally {
+                      setSendingEmail(false);
+                    }
+                  }}
+                  className="mt-2 flex items-center gap-1.5 text-left disabled:opacity-50"
+                  style={{ fontSize: 12, color: '#4361EE', fontWeight: 600 }}>
+                  <Mail className="w-3.5 h-3.5" />
+                  {sendingEmail ? 'Envoi…' : "Renvoyer l'email d'activation"}
+                </button>
+              )}
+              {emailMsg && <p style={{ fontSize: 12, color: '#16A34A', marginTop: 6 }}>{emailMsg}</p>}
+            </Field>
             <Field label="Téléphone"><Input value={form.phone} onChange={e => f('phone', e.target.value)} placeholder="01 23 45 67 89" /></Field>
           </div>
         </div>
@@ -120,7 +147,7 @@ export function AgentsCRUD({ route, navigate, agents, onCreate, onUpdate, onDele
     const id = route.replace('agents/edit/', '');
     const agent = agents.find(a => a.id === id);
     if (!agent) { navigate('agents'); return null; }
-    return <FormPage title={`Modifier — ${agent.name}`} back="Retour" navigate={navigate}
+    return <FormPage title={`Modifier — ${agent.name}`} back="Retour" navigate={navigate} agentId={id}
       initial={{ name: agent.name, department: agent.department, email: agent.email, phone: agent.phone, code: agent.code, active: agent.active }}
       onSubmit={f => onUpdate(id, f)} />;
   }

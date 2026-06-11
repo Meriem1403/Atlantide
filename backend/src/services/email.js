@@ -1,8 +1,21 @@
 import nodemailer from 'nodemailer';
+import pool from '../config/database.js';
 import { APP_NAME } from '../config/branding.js';
 import { getEmailLogoAttachment } from './emailBranding.js';
 
 const enabled = process.env.MAIL_ENABLED !== 'false';
+
+async function resolveMailFrom() {
+  if (process.env.MAIL_FROM) return process.env.MAIL_FROM;
+  try {
+    const res = await pool.query('SELECT mail_from FROM settings WHERE id = 1');
+    const addr = res.rows[0]?.mail_from?.trim();
+    if (addr) return `${APP_NAME} <${addr}>`;
+  } catch {
+    // ignore
+  }
+  return `${APP_NAME} <noreply@ticketsrepas.local>`;
+}
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'mailpit',
@@ -24,7 +37,7 @@ export async function sendMail({ to, subject, text, html, attachments = [] }) {
     }
 
     await transporter.sendMail({
-      from: process.env.MAIL_FROM || `${APP_NAME} <noreply@ticketsrepas.local>`,
+      from: await resolveMailFrom(),
       to,
       subject,
       text,

@@ -4,10 +4,11 @@ import {
 } from '../utils/mappers.js';
 
 export async function loadAppState(user) {
-  const settings = await pool.query('SELECT org_name, org_logo, notification_email FROM settings WHERE id = 1');
+  const settings = await pool.query('SELECT org_name, org_logo, notification_email, mail_from FROM settings WHERE id = 1');
   const orgName = settings.rows[0]?.org_name ?? 'Mairie de Paris';
   const orgLogo = settings.rows[0]?.org_logo ?? '';
   const notificationEmail = settings.rows[0]?.notification_email ?? '';
+  const mailFrom = settings.rows[0]?.mail_from ?? '';
 
   if (user.role === 'admin') {
     const [agents, providers, subventions, tickets, invoices, plans] = await Promise.all([
@@ -33,6 +34,7 @@ export async function loadAppState(user) {
       orgName,
       orgLogo,
       notificationEmail,
+      mailFrom,
     };
   }
 

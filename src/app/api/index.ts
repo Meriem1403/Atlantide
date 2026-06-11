@@ -182,9 +182,15 @@ export async function importDatadoc(): Promise<{ success: boolean; output: strin
   return apiFetch('/datadoc/import', { method: 'POST' });
 }
 
-export async function updateSettings(orgName: string, orgLogo: string, notificationEmail?: string) {
-  return apiFetch<{ orgName: string; orgLogo: string; notificationEmail: string }>('/settings', {
+export async function updateSettings(orgName: string, orgLogo: string, notificationEmail?: string, mailFrom?: string) {
+  return apiFetch<{ orgName: string; orgLogo: string; notificationEmail: string; mailFrom: string }>('/settings', {
     method: 'PUT',
-    body: JSON.stringify({ orgName, orgLogo, notificationEmail }),
+    body: JSON.stringify({ orgName, orgLogo, notificationEmail, mailFrom }),
+  });
+}
+
+export async function resendAgentSetupEmail(agentId: string) {
+  return apiFetch<{ success: boolean; emailed?: boolean; email?: string }>(`/agents/${agentId}/resend-setup-email`, {
+    method: 'POST',
   });
 }
