@@ -131,6 +131,26 @@ export default function App() {
     await refreshState();
   }, [refreshState]);
 
+  // Admin / agent : rafraîchir quand un prestataire valide un ticket ailleurs
+  useEffect(() => {
+    if (!currentUser || currentUser.role === 'provider') return;
+
+    const tick = () => { refreshState().catch(() => {}); };
+    const interval = window.setInterval(tick, 8000);
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') tick();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', tick);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', tick);
+    };
+  }, [currentUser, refreshState]);
+
   if (booting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
