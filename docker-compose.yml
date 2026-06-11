@@ -1,0 +1,79 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ticketsrepas-db
+    environment:
+      POSTGRES_DB: ticketsrepas
+      POSTGRES_USER: ticketsrepas
+      POSTGRES_PASSWORD: ticketsrepas
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ticketsrepas -d ticketsrepas"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit
+    container_name: ticketsrepas-mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: ticketsrepas-backend
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ticketsrepas
+      DB_USER: ticketsrepas
+      DB_PASSWORD: ticketsrepas
+      JWT_SECRET: dev-jwt-secret-change-in-production
+      FRONTEND_URL: http://localhost:5173
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      MAIL_FROM: "Tickets Repas <noreply@ticketsrepas.local>"
+      ADMIN_NOTIFICATION_EMAIL: compta@mairie.fr
+      DATADOC_PATH: /datadoc
+      ORG_NAME: Ministère chargé de la Mer et de la Pêche
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/migrations:/app/migrations
+      - ./datadoc:/datadoc:ro
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ticketsrepas-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./src:/app/src
+      - ./index.html:/app/index.html
+      - ./vite.config.ts:/app/vite.config.ts
+      - ./package.json:/app/package.json
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+      VITE_API_PROXY: http://backend:3000
+    stdin_open: true
+    tty: true
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
