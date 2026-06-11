@@ -7,6 +7,7 @@ const ORG_NAME = process.env.ORG_NAME || 'Ministère chargé de la Mer et de la 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const candidates = [
+  path.resolve(__dirname, '../assets/org-logo.png'),
   '/datadoc/org-logo.png',
   path.resolve(__dirname, '../../datadoc/org-logo.png'),
   path.resolve(__dirname, '../../public/org-logo.png'),
