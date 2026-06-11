@@ -1,4 +1,5 @@
 import { APP_NAME } from '../config/branding.js';
+import { emailLogoHeaderHtml } from './emailBranding.js';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const BRAND = '#003189';
@@ -17,8 +18,9 @@ function layout({ preheader, title, bodyHtml, ctaLabel, ctaUrl, footerNote }) {
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F4F6FA;padding:32px 16px;">
     <tr><td align="center">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgba(0,49,137,0.08);">
+        ${emailLogoHeaderHtml()}
         <tr>
-          <td style="background:linear-gradient(135deg, ${BRAND} 0%, #1E5BB8 100%);padding:28px 32px;">
+          <td style="background:linear-gradient(135deg, ${BRAND} 0%, #1E5BB8 100%);padding:24px 32px 28px;">
             <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.75);font-weight:600;">${APP_NAME}</div>
             <div style="font-size:22px;font-weight:700;color:#ffffff;margin-top:8px;line-height:1.3;">${title}</div>
           </td>
