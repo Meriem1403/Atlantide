@@ -1,0 +1,10 @@
+# Railway — https://docs.railway.com/guides/config-as-code
+# Dans le dashboard : Settings → Root Directory = backend
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "npm run migrate && npm start"
+healthcheckPath = "/api/health"
+restartPolicyType = "ON_FAILURE"
