@@ -1,0 +1,35 @@
+{
+  "name": "ticketsrepas-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "API Tickets Repas",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "migrate": "node migrations/migrate.js",
+    "seed": "node migrations/seed.js",
+    "import-datadoc": "node migrations/importDatadoc.js",
+    "generate-tickets": "node migrations/generateTicketsFromPlans.js",
+    "provision-agents": "node migrations/provisionAgentUsers.js",
+    "resend-setup-emails": "node migrations/resendSetupEmails.js",
+    "set-branding": "node migrations/setOrgBranding.js",
+    "provision-providers": "node migrations/provisionProviderUsers.js",
+    "reset-used-tickets": "node migrations/resetUsedTickets.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^6.9.16",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.9",
+    "supertest": "^7.0.0"
+  }
+}
