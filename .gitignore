@@ -6,3 +6,4 @@ backend/.env
 .DS_Store
 coverage/
 datadoc/IDENTIFIANTS.md
+Image*.png
