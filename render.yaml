@@ -14,7 +14,7 @@ services:
     plan: free
     rootDir: backend
     buildCommand: npm install
-    startCommand: npm run migrate && npm start
+    startCommand: npm run migrate && npm run ensure-admin && npm start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
