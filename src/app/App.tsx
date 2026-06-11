@@ -117,8 +117,8 @@ export default function App() {
   const deleteTicket = useCallback(wrap((id: string) => api.deleteTicket(id)), [wrap]);
   const approveInvoice = useCallback(wrap((id: string, note: string) => api.approveInvoice(id, note)), [wrap]);
   const rejectInvoice = useCallback(wrap((id: string, note: string) => api.rejectInvoice(id, note)), [wrap]);
-  const updateSettings = useCallback(wrap((orgName: string, orgLogo: string, notificationEmail?: string) =>
-    api.updateSettings(orgName, orgLogo, notificationEmail)), [wrap]);
+  const updateSettings = useCallback(wrap((orgName: string, orgLogo: string, notificationEmail?: string, mailFrom?: string) =>
+    api.updateSettings(orgName, orgLogo, notificationEmail, mailFrom)), [wrap]);
 
   const validateTicket = useCallback(async (ticketNumber: string, _providerId: string, _providerName: string) => {
     const result = await api.validateTicket(ticketNumber);

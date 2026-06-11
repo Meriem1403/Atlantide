@@ -49,7 +49,7 @@ interface Props {
   onDeleteTicket: (id: string) => void;
   onApproveInvoice: (id: string, note: string) => void;
   onRejectInvoice: (id: string, note: string) => void;
-  onUpdateSettings: (orgName: string, orgLogo: string, notificationEmail?: string) => void;
+  onUpdateSettings: (orgName: string, orgLogo: string, notificationEmail?: string, mailFrom?: string) => void;
 }
 
 const CHART_COLORS = ['#4361EE', '#2DC653', '#F59E0B', '#8B5CF6', '#E63946'];
@@ -373,7 +373,7 @@ export function AdminApp(props: Props) {
         onApprove={props.onApproveInvoice} onReject={props.onRejectInvoice} />
     );
     if (route === 'settings') return (
-      <SettingsPage orgName={state.orgName} orgLogo={state.orgLogo} notificationEmail={state.notificationEmail ?? ''} onSave={props.onUpdateSettings} />
+      <SettingsPage orgName={state.orgName} orgLogo={state.orgLogo} notificationEmail={state.notificationEmail ?? ''} mailFrom={state.mailFrom ?? ''} onSave={props.onUpdateSettings} />
     );
     return null;
   };

@@ -7,19 +7,22 @@ interface Props {
   orgName: string;
   orgLogo: string;
   notificationEmail: string;
-  onSave: (orgName: string, orgLogo: string, notificationEmail?: string) => void;
+  mailFrom: string;
+  onSave: (orgName: string, orgLogo: string, notificationEmail?: string, mailFrom?: string) => void;
 }
 
-export function SettingsPage({ orgName, orgLogo, notificationEmail, onSave }: Props) {
+export function SettingsPage({ orgName, orgLogo, notificationEmail, mailFrom, onSave }: Props) {
   const [name, setName] = useState(orgName);
   const [logo, setLogo] = useState(orgLogo);
   const [notifEmail, setNotifEmail] = useState(notificationEmail);
+  const [fromEmail, setFromEmail] = useState(mailFrom);
   const [saved, setSaved] = useState(false);
 
   // Sync when props change (e.g. external update)
   useEffect(() => { setName(orgName); }, [orgName]);
   useEffect(() => { setLogo(orgLogo); }, [orgLogo]);
   useEffect(() => { setNotifEmail(notificationEmail); }, [notificationEmail]);
+  useEffect(() => { setFromEmail(mailFrom); }, [mailFrom]);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -30,7 +33,7 @@ export function SettingsPage({ orgName, orgLogo, notificationEmail, onSave }: Pr
   };
 
   const handleSave = () => {
-    onSave(name, logo, notifEmail);
+    onSave(name, logo, notifEmail, fromEmail);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
@@ -66,21 +69,42 @@ export function SettingsPage({ orgName, orgLogo, notificationEmail, onSave }: Pr
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-6" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid rgba(17,24,39,0.07)' }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Notifications email</h3>
-            <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6, color: '#374151' }}>
-              Email administrateur
-            </label>
-            <input
-              value={notifEmail}
-              onChange={e => setNotifEmail(e.target.value)}
-              type="email"
-              placeholder="compta@mairie.fr"
-              className="w-full rounded-xl border border-border px-4 py-3 outline-none focus:border-primary transition-colors"
-              style={{ background: '#F9FAFB', fontSize: 15 }}
-            />
-            <p style={{ fontSize: 12, color: '#9CA3AF', marginTop: 8 }}>
-              Reçoit les alertes : nouvelles factures, validations, génération de tickets.
+          <div className="bg-white rounded-2xl p-6 space-y-5" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid rgba(17,24,39,0.07)' }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700 }}>Emails</h3>
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6, color: '#374151' }}>
+                Adresse expéditrice
+              </label>
+              <input
+                value={fromEmail}
+                onChange={e => setFromEmail(e.target.value)}
+                type="email"
+                placeholder="meriemzahzouh@gmail.com"
+                className="w-full rounded-xl border border-border px-4 py-3 outline-none focus:border-primary transition-colors"
+                style={{ background: '#F9FAFB', fontSize: 15 }}
+              />
+              <p style={{ fontSize: 12, color: '#9CA3AF', marginTop: 8 }}>
+                Adresse affichée comme expéditeur des emails (activation agent, notifications…). Doit correspondre au compte SMTP configuré sur le serveur.
+              </p>
+            </div>
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6, color: '#374151' }}>
+                Email administrateur (alertes reçues)
+              </label>
+              <input
+                value={notifEmail}
+                onChange={e => setNotifEmail(e.target.value)}
+                type="email"
+                placeholder="compta@mairie.fr"
+                className="w-full rounded-xl border border-border px-4 py-3 outline-none focus:border-primary transition-colors"
+                style={{ background: '#F9FAFB', fontSize: 15 }}
+              />
+              <p style={{ fontSize: 12, color: '#9CA3AF', marginTop: 8 }}>
+                Reçoit les copies : nouvelles factures, validations de tickets, génération de tickets.
+              </p>
+            </div>
+            <p style={{ fontSize: 12, color: '#D97706', background: '#FEF3C7', padding: '10px 12px', borderRadius: 10 }}>
+              En production (Render), configurez aussi SMTP_HOST, SMTP_USER, SMTP_PASS et MAIL_ENABLED=true dans les variables d&apos;environnement du serveur.
             </p>
           </div>
 

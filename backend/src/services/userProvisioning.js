@@ -53,6 +53,41 @@ export async function provisionAgentUser(client, agent, { sendEmail = true } = {
   return { skipped: false, userId, username, email, setupUrl };
 }
 
+/** Met à jour l'email du compte agent et renvoie un lien d'activation si demandé. */
+export async function syncAgentUserEmail(client, agent, { sendEmail = false, forceResend = false } = {}) {
+  const email = (agent.email || '').trim().toLowerCase();
+  if (!email) return { updated: false, reason: 'no_email' };
+
+  const existing = await client.query(
+    'SELECT * FROM users WHERE role = $1 AND profile_id = $2',
+    ['agent', agent.id],
+  );
+  if (!existing.rows.length) {
+    return provisionAgentUser(client, agent, { sendEmail });
+  }
+
+  const user = existing.rows[0];
+  const emailChanged = user.email?.toLowerCase() !== email;
+  const username = await uniqueUsername(client, email, agent.code || 'agent');
+  const setupToken = crypto.randomBytes(32).toString('hex');
+  const expires = new Date(Date.now() + SETUP_TTL_HOURS * 3600 * 1000);
+  const setupUrl = `${FRONTEND_URL}/set-password?token=${setupToken}`;
+
+  await client.query(
+    `UPDATE users SET email = $1, username = $2, setup_token = $3, setup_token_expires = $4, must_change_password = true
+     WHERE id = $5`,
+    [email, username, setupToken, expires, user.id],
+  );
+
+  const shouldEmail = sendEmail && (emailChanged || forceResend);
+  if (shouldEmail) {
+    const mail = setupPasswordEmail({ name: agent.name, username, setupUrl, ttlHours: SETUP_TTL_HOURS });
+    await sendMail({ to: email, ...mail });
+  }
+
+  return { updated: true, emailChanged, email, setupUrl, emailed: shouldEmail };
+}
+
 export async function provisionProviderUser(client, provider, { sendEmail = true, password = DEFAULT_PROVIDER_PASSWORD } = {}) {
   const existing = await client.query(
     'SELECT id FROM users WHERE role = $1 AND profile_id = $2',

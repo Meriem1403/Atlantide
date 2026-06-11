@@ -113,6 +113,7 @@ export interface AppState {
   orgName: string;
   orgLogo: string; // base64 or ''
   notificationEmail?: string;
+  mailFrom?: string;
 }
 
 // ─── Initial Data ─────────────────────────────────────────────────────────────
