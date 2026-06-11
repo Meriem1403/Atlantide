@@ -5,6 +5,6 @@
 builder = "NIXPACKS"
 
 [deploy]
-startCommand = "npm run migrate && npm start"
+startCommand = "npm run migrate && npm run ensure-admin && npm start"
 healthcheckPath = "/api/health"
 restartPolicyType = "ON_FAILURE"
