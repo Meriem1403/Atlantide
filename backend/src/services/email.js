@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { APP_NAME } from '../config/branding.js';
 
 const enabled = process.env.MAIL_ENABLED !== 'false';
 
@@ -16,7 +17,7 @@ export async function sendMail({ to, subject, text, html }) {
   if (!enabled || !to) return;
   try {
     await transporter.sendMail({
-      from: process.env.MAIL_FROM || 'Tickets Repas <noreply@ticketsrepas.local>',
+      from: process.env.MAIL_FROM || `${APP_NAME} <noreply@ticketsrepas.local>`,
       to,
       subject,
       text,

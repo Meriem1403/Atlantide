@@ -20,6 +20,7 @@ import { TicketsCRUD } from './TicketsCRUD';
 import { InvoicesAdmin } from './InvoicesAdmin';
 import { SettingsPage } from './SettingsPage';
 import { OrgLogo } from '../shared/OrgLogo';
+import { APP_NAME } from '../../config/branding';
 
 export type AdminRoute =
   | 'dashboard'
@@ -301,8 +302,8 @@ export function AdminApp(props: Props) {
         <div className="flex items-center gap-3">
           <OrgLogo src={state.orgLogo} size={36} onDark />
           <div className="min-w-0">
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'white' }} className="truncate">{state.orgName || 'Tickets Repas'}</div>
-            <div style={{ fontSize: 11, color: '#94A3B8' }}>Administration</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'white' }} className="truncate">{state.orgName || APP_NAME}</div>
+            <div style={{ fontSize: 11, color: '#94A3B8' }}>{APP_NAME}</div>
           </div>
         </div>
       </div>

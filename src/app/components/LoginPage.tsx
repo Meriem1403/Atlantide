@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Eye, EyeOff, Lock, User, Ticket, ArrowRight } from 'lucide-react';
+import { APP_NAME } from '../config/branding';
 interface Props {
   onLogin: (username: string, password: string) => Promise<void>;
   onForgotPassword?: () => void;
@@ -53,8 +54,8 @@ export function LoginPage({ onLogin, onForgotPassword }: Props) {
               <Ticket className="w-7 h-7 text-white" />
             </div>
             <div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: 'white', letterSpacing: '-0.3px' }}>Tickets Repas</div>
-              <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)' }}>Restauration collective</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'white', letterSpacing: '-0.3px' }}>{APP_NAME}</div>
+              <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)' }}>Tickets restaurant</div>
             </div>
           </div>
 
@@ -87,7 +88,7 @@ export function LoginPage({ onLogin, onForgotPassword }: Props) {
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4" style={{ background: 'linear-gradient(135deg, #4361EE, #6B8EFF)' }}>
               <Ticket className="w-7 h-7 text-white" />
             </div>
-            <h1 style={{ fontSize: 26, fontWeight: 800, color: '#111827' }}>Tickets Repas</h1>
+            <h1 style={{ fontSize: 26, fontWeight: 800, color: '#111827' }}>{APP_NAME}</h1>
           </div>
 
           <div className="bg-white rounded-3xl p-8 lg:p-10" style={{ boxShadow: '0 8px 40px rgba(17,24,39,0.08)', border: '1px solid rgba(17,24,39,0.06)' }}>

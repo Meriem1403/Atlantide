@@ -1,4 +1,5 @@
 import pool from '../config/database.js';
+import { APP_NAME } from '../config/branding.js';
 import { sendMail } from './email.js';
 import {
   ticketsGeneratedEmail,
@@ -8,7 +9,7 @@ import {
 
 async function getSettings() {
   const res = await pool.query('SELECT org_name, notification_email FROM settings WHERE id = 1');
-  return res.rows[0] || { org_name: 'Tickets Repas', notification_email: process.env.ADMIN_NOTIFICATION_EMAIL || '' };
+  return res.rows[0] || { org_name: APP_NAME, notification_email: process.env.ADMIN_NOTIFICATION_EMAIL || '' };
 }
 
 export async function notifyTicketsGenerated(agent, month, count) {
