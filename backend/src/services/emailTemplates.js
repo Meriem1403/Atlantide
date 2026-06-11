@@ -1,3 +1,5 @@
+import { APP_NAME } from '../config/branding.js';
+
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const BRAND = '#003189';
 const BRAND_LIGHT = '#E8EEF8';
@@ -17,7 +19,7 @@ function layout({ preheader, title, bodyHtml, ctaLabel, ctaUrl, footerNote }) {
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgba(0,49,137,0.08);">
         <tr>
           <td style="background:linear-gradient(135deg, ${BRAND} 0%, #1E5BB8 100%);padding:28px 32px;">
-            <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.75);font-weight:600;">Tickets Repas</div>
+            <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.75);font-weight:600;">${APP_NAME}</div>
             <div style="font-size:22px;font-weight:700;color:#ffffff;margin-top:8px;line-height:1.3;">${title}</div>
           </td>
         </tr>
@@ -36,7 +38,7 @@ function layout({ preheader, title, bodyHtml, ctaLabel, ctaUrl, footerNote }) {
         <tr>
           <td style="padding:20px 32px 28px;background:${BRAND_LIGHT};border-top:1px solid #D7E2F2;">
             <p style="margin:0;font-size:12px;color:#4B5563;line-height:1.5;">
-              ${footerNote || 'Ministère chargé de la Mer et de la Pêche — Plateforme Tickets Repas'}
+              ${footerNote || `Ministère chargé de la Mer et de la Pêche — ${APP_NAME}`}
             </p>
             <p style="margin:8px 0 0;font-size:11px;color:#9CA3AF;">Cet email est envoyé automatiquement, merci de ne pas y répondre.</p>
           </td>
@@ -55,7 +57,7 @@ export function setupPasswordEmail({ name, username, setupUrl, ttlHours }) {
     title,
     bodyHtml: `
       <p style="margin:0 0 16px;">Bonjour <strong>${name}</strong>,</p>
-      <p style="margin:0 0 16px;">Votre compte sur la plateforme <strong>Tickets Repas</strong> a été créé. Pour consulter et télécharger vos tickets, définissez dès maintenant votre mot de passe personnel.</p>
+      <p style="margin:0 0 16px;">Votre compte sur la plateforme <strong>${APP_NAME}</strong> a été créé. Pour consulter et télécharger vos tickets, définissez dès maintenant votre mot de passe personnel.</p>
       <table role="presentation" width="100%" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;margin:0 0 16px;">
         <tr><td style="padding:16px 18px;">
           <div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:0.08em;font-weight:600;">Identifiant de connexion</div>
@@ -67,23 +69,23 @@ export function setupPasswordEmail({ name, username, setupUrl, ttlHours }) {
     ctaUrl: setupUrl,
   });
   const text = `Bonjour ${name},\n\nCréez votre mot de passe : ${setupUrl}\n\nIdentifiant : ${username}\n\nLien valable ${ttlHours}h.`;
-  return { subject: 'Tickets Repas — Activez votre compte agent', html, text };
+  return { subject: `${APP_NAME} — Activez votre compte agent`, html, text };
 }
 
 export function resetPasswordEmail({ name, resetUrl, ttlHours }) {
   const title = 'Réinitialisation du mot de passe';
   const html = layout({
-    preheader: 'Demande de réinitialisation de votre mot de passe Tickets Repas.',
+    preheader: `Demande de réinitialisation de votre mot de passe ${APP_NAME}.`,
     title,
     bodyHtml: `
       <p style="margin:0 0 16px;">Bonjour <strong>${name}</strong>,</p>
-      <p style="margin:0 0 16px;">Nous avons reçu une demande de réinitialisation de mot de passe pour votre compte Tickets Repas. Si vous êtes à l'origine de cette demande, cliquez sur le bouton ci-dessous.</p>
+      <p style="margin:0 0 16px;">Nous avons reçu une demande de réinitialisation de mot de passe pour votre compte ${APP_NAME}. Si vous êtes à l'origine de cette demande, cliquez sur le bouton ci-dessous.</p>
       <p style="margin:0;color:#6B7280;font-size:13px;">Lien valable <strong>${ttlHours} heures</strong>. Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>`,
     ctaLabel: 'Réinitialiser mon mot de passe',
     ctaUrl: resetUrl,
   });
   const text = `Bonjour ${name},\n\nRéinitialisez votre mot de passe : ${resetUrl}\n\nLien valable ${ttlHours}h.`;
-  return { subject: 'Tickets Repas — Réinitialisation du mot de passe', html, text };
+  return { subject: `${APP_NAME} — Réinitialisation du mot de passe`, html, text };
 }
 
 export function ticketsGeneratedEmail({ name, orgName, count, monthLabel }) {
@@ -130,11 +132,11 @@ export function ticketValidatedEmail({ name, orgName, ticketNumber, providerName
 
 export function providerWelcomeEmail({ name, username, password, loginUrl }) {
   const html = layout({
-    preheader: 'Vos identifiants prestataire Tickets Repas.',
+    preheader: `Vos identifiants prestataire ${APP_NAME}.`,
     title: 'Votre espace prestataire',
     bodyHtml: `
       <p style="margin:0 0 16px;">Bonjour <strong>${name}</strong>,</p>
-      <p style="margin:0 0 16px;">Votre compte prestataire sur la plateforme Tickets Repas est actif. Utilisez les identifiants ci-dessous pour valider les tickets et soumettre vos factures.</p>
+      <p style="margin:0 0 16px;">Votre compte prestataire sur la plateforme ${APP_NAME} est actif. Utilisez les identifiants ci-dessous pour valider les tickets et soumettre vos factures.</p>
       <table role="presentation" width="100%" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;">
         <tr><td style="padding:16px 18px;">
           <div style="font-size:11px;color:#6B7280;text-transform:uppercase;">Identifiant</div>
@@ -148,7 +150,7 @@ export function providerWelcomeEmail({ name, username, password, loginUrl }) {
     ctaUrl: loginUrl,
   });
   const text = `Bonjour ${name},\n\nIdentifiant : ${username}\nMot de passe : ${password}\n\n${loginUrl}`;
-  return { subject: 'Tickets Repas — Accès prestataire', html, text };
+  return { subject: `${APP_NAME} — Accès prestataire`, html, text };
 }
 
 export function adminNotificationEmail({ title, bodyLines, orgName }) {

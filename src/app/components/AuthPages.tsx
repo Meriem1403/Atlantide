@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Lock, Mail, ArrowLeft, Ticket } from 'lucide-react';
 import * as api from '../api';
+import { APP_NAME } from '../config/branding';
 
 type Mode = 'forgot' | 'setup' | 'reset';
 
@@ -83,7 +84,10 @@ export function AuthPages({
           <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: '#EEF2FF' }}>
             <Ticket className="w-5 h-5" style={{ color: '#4361EE' }} />
           </div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#111827' }}>{titles[mode]}</h1>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#94A3B8', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>{APP_NAME}</div>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: '#111827' }}>{titles[mode]}</h1>
+          </div>
         </div>
 
         {mode === 'forgot' && (
