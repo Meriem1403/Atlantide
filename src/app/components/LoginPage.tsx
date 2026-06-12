@@ -154,7 +154,7 @@ export function LoginPage({ onLogin, onForgotPassword }: Props) {
               {onForgotPassword && (
                 <button type="button" onClick={onForgotPassword}
                   className="w-full text-center pt-1" style={{ fontSize: 13, color: '#4361EE', fontWeight: 500 }}>
-                  Première connexion ou mot de passe oublié ?
+                  Première connexion / mot de passe oublié
                 </button>
               )}
             </form>

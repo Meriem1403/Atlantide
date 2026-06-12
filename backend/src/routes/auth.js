@@ -4,11 +4,12 @@ import crypto from 'crypto';
 import pool from '../config/database.js';
 import { authenticateToken, signToken } from '../middleware/auth.js';
 import { sendMail } from '../services/email.js';
-import { resetPasswordEmail } from '../services/emailTemplates.js';
+import { resetPasswordEmail, setupPasswordEmail } from '../services/emailTemplates.js';
 
 const router = Router();
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const RESET_TTL_HOURS = Number(process.env.RESET_TOKEN_TTL_HOURS || 24);
+const SETUP_TTL_HOURS = Number(process.env.SETUP_TOKEN_TTL_HOURS || 72);
 
 function mapUserResponse(user, token) {
   return {
@@ -152,18 +153,40 @@ router.post('/forgot-password', async (req, res) => {
 
     const user = await findUserByLogin(email);
     if (user) {
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      const expires = new Date(Date.now() + RESET_TTL_HOURS * 3600 * 1000);
-      await pool.query(
-        `UPDATE users SET reset_token = $2, reset_token_expires = $3 WHERE id = $1`,
-        [user.id, resetToken, expires],
-      );
-      const resetUrl = `${FRONTEND_URL}/reset-password?token=${resetToken}`;
-      const mail = resetPasswordEmail({ name: user.name, resetUrl, ttlHours: RESET_TTL_HOURS });
       const to = user.email || user.username;
+      const needsSetup = Boolean(user.must_change_password || user.setup_token);
+
+      let mail;
+      if (needsSetup) {
+        const setupToken = crypto.randomBytes(32).toString('hex');
+        const expires = new Date(Date.now() + SETUP_TTL_HOURS * 3600 * 1000);
+        await pool.query(
+          `UPDATE users SET setup_token = $2, setup_token_expires = $3, must_change_password = true,
+           reset_token = NULL, reset_token_expires = NULL WHERE id = $1`,
+          [user.id, setupToken, expires],
+        );
+        const setupUrl = `${FRONTEND_URL}/set-password?token=${setupToken}`;
+        mail = setupPasswordEmail({
+          name: user.name,
+          username: to,
+          setupUrl,
+          ttlHours: SETUP_TTL_HOURS,
+        });
+      } else {
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const expires = new Date(Date.now() + RESET_TTL_HOURS * 3600 * 1000);
+        await pool.query(
+          `UPDATE users SET reset_token = $2, reset_token_expires = $3,
+           setup_token = NULL, setup_token_expires = NULL WHERE id = $1`,
+          [user.id, resetToken, expires],
+        );
+        const resetUrl = `${FRONTEND_URL}/reset-password?token=${resetToken}`;
+        mail = resetPasswordEmail({ name: user.name, resetUrl, ttlHours: RESET_TTL_HOURS });
+      }
+
       const result = await sendMail({ to, ...mail });
       if (!result.sent && !result.skipped) {
-        console.error(`Email reset ${to}:`, result.error);
+        console.error(`Email auth ${to}:`, result.error);
         return res.status(502).json({ error: `Échec envoi email : ${result.error || 'erreur inconnue'}` });
       }
     }

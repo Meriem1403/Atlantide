@@ -38,7 +38,7 @@ export function AuthPages({
       setLoading(true);
       try {
         await api.forgotPassword(email.trim());
-        setSuccess('Si un compte existe avec cet email, un lien de réinitialisation a été envoyé. Vérifiez aussi les spams (l\'envoi peut prendre une minute).');
+        setSuccess('Si un compte existe avec cet email, un lien a été envoyé (activation ou réinitialisation). Vérifiez votre boîte mail et les spams — cherchez « Atlantide » ou « onboarding@resend.dev ».');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erreur');
       } finally {
@@ -92,7 +92,7 @@ export function AuthPages({
 
         {mode === 'forgot' && (
           <p style={{ fontSize: 14, color: '#6B7280', marginBottom: 20 }}>
-            Saisissez votre adresse email professionnelle. Vous recevrez un lien pour définir un nouveau mot de passe.
+            Saisissez l&apos;email renseigné sur votre fiche agent. Vous recevrez un lien pour créer ou réinitialiser votre mot de passe.
           </p>
         )}
 
