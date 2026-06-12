@@ -184,7 +184,7 @@ router.post('/forgot-password', async (req, res) => {
           setupUrl: sync.setupUrl,
           ttlHours: SETUP_TTL_HOURS,
         });
-        const emailResult = await sendMail({ to: deliveryTo, ...mail });
+        const emailResult = await sendMail({ to: deliveryTo, ...mail, transactional: true });
         if (!emailResult.sent && !emailResult.skipped) {
           return res.status(502).json({
             error: `Échec envoi email : ${emailResult.error || 'erreur inconnue'}`,
@@ -193,7 +193,7 @@ router.post('/forgot-password', async (req, res) => {
 
         return res.json({
           success: true,
-          message: `Email d'activation envoyé à ${deliveryTo}. Cherchez dans Gmail : from:onboarding@resend.dev (aussi dans Spams et Promotions).`,
+          message: `Email d'activation envoyé à ${deliveryTo}. Objet : [Atlantide] Activez votre compte agent. Vérifiez aussi les spams en attendant la configuration du domaine dirm.fr.`,
         });
       } catch (err) {
         await client.query('ROLLBACK');
@@ -237,7 +237,7 @@ router.post('/forgot-password', async (req, res) => {
         mail = resetPasswordEmail({ name: user.name, resetUrl, ttlHours: RESET_TTL_HOURS });
       }
 
-      const result = await sendMail({ to: deliveryTo, ...mail });
+      const result = await sendMail({ to: deliveryTo, ...mail, transactional: true });
       if (!result.sent && !result.skipped) {
         console.error(`Email auth ${deliveryTo}:`, result.error);
         return res.status(502).json({ error: `Échec envoi email : ${result.error || 'erreur inconnue'}` });
