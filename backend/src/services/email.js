@@ -53,31 +53,28 @@ const transporter = nodemailer.createTransport({
   } : undefined,
 });
 
-function buildResendAttachments(extraAttachments = []) {
-  const logo = getEmailLogoAttachment();
-  const resendAttachments = [];
+function toResendAttachment({ filename, content, cid, contentType }) {
+  const buffer = Buffer.isBuffer(content) ? content : Buffer.from(content);
+  const item = {
+    filename: filename || 'attachment',
+    content: buffer,
+    contentType,
+  };
+  if (cid) item.inlineContentId = cid;
+  return item;
+}
 
-  if (logo) {
-    resendAttachments.push({
-      filename: logo.filename,
-      content: logo.content,
-      content_id: logo.cid,
-    });
+function buildResendAttachments(html, extraAttachments = []) {
+  const resendAttachments = [];
+  const logo = getEmailLogoAttachment();
+  const needsLogo = logo && html?.includes(`cid:${logo.cid}`);
+
+  if (needsLogo) {
+    resendAttachments.push(toResendAttachment(logo));
   }
 
   for (const a of extraAttachments) {
-    if (a.cid) {
-      resendAttachments.push({
-        filename: a.filename || 'attachment',
-        content: a.content,
-        content_id: a.cid,
-      });
-    } else {
-      resendAttachments.push({
-        filename: a.filename || 'attachment',
-        content: a.content,
-      });
-    }
+    resendAttachments.push(toResendAttachment(a));
   }
 
   return resendAttachments.length ? resendAttachments : undefined;
@@ -94,7 +91,7 @@ async function sendViaResend({ to, subject, text, html, attachments = [] }) {
     subject,
     text,
     html: htmlBody,
-    attachments: buildResendAttachments(attachments),
+    attachments: buildResendAttachments(htmlBody, attachments),
   });
 
   if (error) throw new Error(error.message || 'Erreur Resend');
