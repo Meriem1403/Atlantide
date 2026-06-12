@@ -5,6 +5,7 @@ import pool from '../config/database.js';
 import { authenticateToken, signToken } from '../middleware/auth.js';
 import { sendMail } from '../services/email.js';
 import { resetPasswordEmail, setupPasswordEmail } from '../services/emailTemplates.js';
+import { syncAgentUserEmail } from '../services/userProvisioning.js';
 
 const router = Router();
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -160,10 +161,41 @@ router.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
     if (!email?.trim()) return res.status(400).json({ error: 'Email requis' });
 
+    const deliveryTo = email.trim().toLowerCase();
+
+    // Agents : exactement le même envoi que « Renvoyer l'email d'activation » (admin)
+    const agentRes = await pool.query(
+      'SELECT * FROM agents WHERE LOWER(email) = $1 AND active = true',
+      [deliveryTo],
+    );
+    if (agentRes.rows.length) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const sync = await syncAgentUserEmail(client, agentRes.rows[0], {
+          sendEmail: true,
+          forceResend: true,
+        });
+        await client.query('COMMIT');
+        if (sync.emailResult && !sync.emailResult.sent && !sync.emailResult.skipped) {
+          return res.status(502).json({
+            error: `Échec envoi email : ${sync.emailResult.error || 'erreur inconnue'}`,
+          });
+        }
+        return res.json({
+          success: true,
+          message: `Email d'activation envoyé à ${deliveryTo}. Vérifiez votre boîte mail et les spams (expéditeur : onboarding@resend.dev).`,
+        });
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+    }
+
     const user = await findUserByLogin(email);
     if (user) {
-      // Toujours envoyer à l'adresse saisie (souvent l'email agent), pas un vieux @dirm.fr en base
-      const deliveryTo = email.trim().toLowerCase();
       const needsSetup = Boolean(user.must_change_password || user.setup_token);
 
       await pool.query('UPDATE users SET email = $2 WHERE id = $1', [user.id, deliveryTo]);
@@ -201,9 +233,16 @@ router.post('/forgot-password', async (req, res) => {
         console.error(`Email auth ${deliveryTo}:`, result.error);
         return res.status(502).json({ error: `Échec envoi email : ${result.error || 'erreur inconnue'}` });
       }
+      const kind = needsSetup ? 'activation' : 'réinitialisation';
+      return res.json({
+        success: true,
+        message: `Email de ${kind} envoyé à ${deliveryTo}. Vérifiez votre boîte mail et les spams.`,
+      });
     }
 
-    res.json({ success: true, message: 'Si un compte existe, un email a été envoyé.' });
+    return res.status(404).json({
+      error: 'Aucun compte actif avec cet email. Utilisez l\'adresse indiquée sur votre fiche agent.',
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erreur serveur' });
