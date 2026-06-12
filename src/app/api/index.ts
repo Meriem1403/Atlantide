@@ -38,10 +38,24 @@ export async function setupPassword(token: string, password: string): Promise<Cu
 }
 
 export async function forgotPassword(email: string) {
-  return apiFetch<{ success: boolean; message: string }>('/auth/forgot-password', {
-    method: 'POST',
-    body: JSON.stringify({ email }),
-  });
+  const maxAttempts = 3;
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await apiFetch<{ success: boolean; message: string }>('/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+        timeoutMs: 120_000,
+      });
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error('Erreur réseau');
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 3000));
+        await wakeApi();
+      }
+    }
+  }
+  throw lastError ?? new Error('Impossible de joindre le serveur');
 }
 
 export async function resetPassword(token: string, password: string) {
