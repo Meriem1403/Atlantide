@@ -160,7 +160,10 @@ router.post('/forgot-password', async (req, res) => {
       );
       const resetUrl = `${FRONTEND_URL}/reset-password?token=${resetToken}`;
       const mail = resetPasswordEmail({ name: user.name, resetUrl, ttlHours: RESET_TTL_HOURS });
-      await sendMail({ to: user.email || user.username, ...mail });
+      const to = user.email || user.username;
+      sendMail({ to, ...mail }).then((r) => {
+        if (!r.sent && !r.skipped) console.error(`Email reset ${to}:`, r.error);
+      });
     }
 
     res.json({ success: true, message: 'Si un compte existe, un email a été envoyé.' });

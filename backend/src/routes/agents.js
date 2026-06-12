@@ -79,6 +79,12 @@ router.post('/:id/resend-setup-email', async (req, res) => {
     await client.query('BEGIN');
     const sync = await syncAgentUserEmail(client, agentRes.rows[0], { sendEmail: true, forceResend: true });
     await client.query('COMMIT');
+    if (sync.emailResult && !sync.emailResult.sent && !sync.emailResult.skipped) {
+      return res.status(502).json({
+        error: `Échec envoi email : ${sync.emailResult.error || 'erreur inconnue'}`,
+        ...sync,
+      });
+    }
     res.json({ success: true, ...sync });
   } catch (err) {
     await client.query('ROLLBACK');

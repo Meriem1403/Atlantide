@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import pool from '../config/database.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { sendMail, verifySmtp } from '../services/email.js';
+import { APP_NAME } from '../config/branding.js';
 
 const router = Router();
 
@@ -26,6 +28,29 @@ router.put('/', authenticateToken, requireRole('admin'), async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+router.post('/test-email', authenticateToken, requireRole('admin'), async (req, res) => {
+  try {
+    const to = (req.body?.to || '').trim();
+    if (!to) return res.status(400).json({ error: 'Adresse destinataire requise (to)' });
+
+    const verify = await verifySmtp();
+    if (!verify.ok) return res.status(400).json({ error: verify.error });
+
+    const result = await sendMail({
+      to,
+      subject: `Test email — ${APP_NAME}`,
+      text: `Ceci est un email de test envoyé depuis ${APP_NAME}. Si vous le recevez, la configuration SMTP est correcte.`,
+    });
+    if (!result.sent) {
+      return res.status(502).json({ error: result.error || 'Échec envoi', result });
+    }
+    res.json({ success: true, to });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || 'Erreur serveur' });
   }
 });
 

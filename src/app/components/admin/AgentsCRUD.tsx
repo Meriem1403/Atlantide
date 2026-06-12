@@ -6,6 +6,7 @@ import { Pagination } from '../shared/Pagination';
 import { AdminRoute } from './AdminApp';
 import { AdminFormLayout } from '../shared/AdminFormLayout';
 import { FilterSelect } from '../shared/FilterSelect';
+import { FormField, FormInput } from '../shared/AdminFormFields';
 
 const PER_PAGE = 9;
 
@@ -13,8 +14,8 @@ interface Props {
   route: string;
   navigate: (r: AdminRoute) => void;
   agents: Agent[];
-  onCreate: (a: Omit<Agent, 'id' | 'createdAt'>) => void;
-  onUpdate: (id: string, a: Partial<Agent>) => void;
+  onCreate: (a: Omit<Agent, 'id' | 'createdAt'>) => Promise<void>;
+  onUpdate: (id: string, a: Partial<Agent>) => Promise<void>;
   onDelete: (id: string) => void;
 }
 
@@ -40,28 +41,16 @@ function FormPage({
   title, back, initial, onSubmit, navigate, agentId,
 }: {
   title: string; back: string; initial: Omit<Agent, 'id' | 'createdAt'>;
-  onSubmit: (f: Omit<Agent, 'id' | 'createdAt'>) => void;
+  onSubmit: (f: Omit<Agent, 'id' | 'createdAt'>) => Promise<void>;
   navigate: (r: AdminRoute) => void;
   agentId?: string;
 }) {
   const [form, setForm] = useState(initial);
   const [emailMsg, setEmailMsg] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const f = (k: keyof typeof form, v: string | boolean) => setForm(p => ({ ...p, [k]: v }));
-
-  const Field = ({ label, req, children }: { label: string; req?: boolean; children: React.ReactNode }) => (
-    <div>
-      <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6, color: '#374151' }}>
-        {label}{req && <span style={{ color: '#E63946' }}> *</span>}
-      </label>
-      {children}
-    </div>
-  );
-
-  const Input = (p: React.InputHTMLAttributes<HTMLInputElement>) => (
-    <input {...p} className="w-full rounded-xl border border-border px-4 py-2.5 outline-none focus:border-primary transition-colors"
-      style={{ background: '#F9FAFB', fontSize: 14, color: '#111827', ...p.style }} />
-  );
 
   return (
     <AdminFormLayout title={title} backLabel="Retour aux agents" onBack={() => navigate('agents')} maxWidth="4xl">
@@ -69,15 +58,15 @@ function FormPage({
         <div className="lg:col-span-2 bg-white rounded-2xl p-6 lg:p-8 space-y-5" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid rgba(17,24,39,0.07)' }}>
           <h3 style={{ fontSize: 16, fontWeight: 700 }}>Identité</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Nom complet" req><Input value={form.name} onChange={e => f('name', e.target.value)} placeholder="Marie Dubois" /></Field>
-            <Field label="Code agent" req>
-              <Input value={form.code} onChange={e => f('code', e.target.value.toUpperCase())} placeholder="DUB" maxLength={5} />
-            </Field>
+            <FormField label="Nom complet" req><FormInput value={form.name} onChange={e => f('name', e.target.value)} placeholder="Marie Dubois" /></FormField>
+            <FormField label="Code agent" req>
+              <FormInput value={form.code} onChange={e => f('code', e.target.value.toUpperCase())} placeholder="DUB" maxLength={5} />
+            </FormField>
           </div>
-          <Field label="Service / Département" req><Input value={form.department} onChange={e => f('department', e.target.value)} placeholder="Direction RH" /></Field>
+          <FormField label="Service / Département" req><FormInput value={form.department} onChange={e => f('department', e.target.value)} placeholder="Direction RH" /></FormField>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Email">
-              <Input type="email" value={form.email} onChange={e => f('email', e.target.value)} placeholder="m.dubois@mairie.fr" />
+            <FormField label="Email">
+              <FormInput type="email" value={form.email} onChange={e => f('email', e.target.value)} placeholder="m.dubois@mairie.fr" />
               {agentId && form.email && (
                 <button type="button" disabled={sendingEmail}
                   onClick={async () => {
@@ -99,27 +88,40 @@ function FormPage({
                 </button>
               )}
               {emailMsg && <p style={{ fontSize: 12, color: '#16A34A', marginTop: 6 }}>{emailMsg}</p>}
-            </Field>
-            <Field label="Téléphone"><Input value={form.phone} onChange={e => f('phone', e.target.value)} placeholder="01 23 45 67 89" /></Field>
+            </FormField>
+            <FormField label="Téléphone"><FormInput value={form.phone} onChange={e => f('phone', e.target.value)} placeholder="01 23 45 67 89" /></FormField>
           </div>
         </div>
 
         <div className="space-y-4">
           <div className="bg-white rounded-2xl p-6" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid rgba(17,24,39,0.07)' }}>
             <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Statut</h3>
-            <Field label="Compte agent">
+            <FormField label="Compte agent">
               <FilterSelect variant="form" value={form.active ? 'true' : 'false'} onChange={e => f('active', e.target.value === 'true')}>
                 <option value="true">Actif</option>
                 <option value="false">Inactif</option>
               </FilterSelect>
-            </Field>
+            </FormField>
           </div>
+          {saveError && <p style={{ fontSize: 13, color: '#DC2626' }}>{saveError}</p>}
           <div className="flex flex-col gap-3">
-            <button onClick={() => { onSubmit(form); navigate('agents'); }}
-              disabled={!form.name || !form.code || !form.department}
+            <button type="button"
+              onClick={async () => {
+                setSaveError('');
+                setSaving(true);
+                try {
+                  await onSubmit(form);
+                  navigate('agents');
+                } catch (err) {
+                  setSaveError(err instanceof Error ? err.message : 'Erreur lors de l\'enregistrement');
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              disabled={saving || !form.name || !form.code || !form.department}
               className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl disabled:opacity-40 transition-all hover:opacity-90"
               style={{ background: '#4361EE', color: 'white', fontSize: 14, fontWeight: 600 }}>
-              <Save className="w-4 h-4" /> Enregistrer
+              <Save className="w-4 h-4" /> {saving ? 'Enregistrement…' : 'Enregistrer'}
             </button>
             <button onClick={() => navigate('agents')} className="px-5 py-3 rounded-xl border border-border bg-white" style={{ fontSize: 14, fontWeight: 500 }}>
               Annuler
@@ -138,7 +140,7 @@ export function AgentsCRUD({ route, navigate, agents, onCreate, onUpdate, onDele
 
   // Route: agents/new
   if (route === 'agents/new') {
-    return <FormPage title="Nouvel agent" back="Retour" initial={blank()}
+    return <FormPage key="agents-new" title="Nouvel agent" back="Retour" initial={blank()}
       onSubmit={onCreate} navigate={navigate} />;
   }
 
@@ -147,7 +149,7 @@ export function AgentsCRUD({ route, navigate, agents, onCreate, onUpdate, onDele
     const id = route.replace('agents/edit/', '');
     const agent = agents.find(a => a.id === id);
     if (!agent) { navigate('agents'); return null; }
-    return <FormPage title={`Modifier — ${agent.name}`} back="Retour" navigate={navigate} agentId={id}
+    return <FormPage key={`agents-edit-${id}`} title={`Modifier — ${agent.name}`} back="Retour" navigate={navigate} agentId={id}
       initial={{ name: agent.name, department: agent.department, email: agent.email, phone: agent.phone, code: agent.code, active: agent.active }}
       onSubmit={f => onUpdate(id, f)} />;
   }
