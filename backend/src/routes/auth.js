@@ -184,13 +184,16 @@ router.post('/forgot-password', async (req, res) => {
           setupUrl: sync.setupUrl,
           ttlHours: SETUP_TTL_HOURS,
         });
-        sendMail({ to: deliveryTo, ...mail }).then((r) => {
-          if (!r.sent && !r.skipped) console.error(`Email forgot agent ${deliveryTo}:`, r.error);
-        });
+        const emailResult = await sendMail({ to: deliveryTo, ...mail });
+        if (!emailResult.sent && !emailResult.skipped) {
+          return res.status(502).json({
+            error: `Échec envoi email : ${emailResult.error || 'erreur inconnue'}`,
+          });
+        }
 
         return res.json({
           success: true,
-          message: `Email d'activation envoyé à ${deliveryTo}. Vérifiez votre boîte mail et les spams (expéditeur : onboarding@resend.dev).`,
+          message: `Email d'activation envoyé à ${deliveryTo}. Cherchez dans Gmail : from:onboarding@resend.dev (aussi dans Spams et Promotions).`,
         });
       } catch (err) {
         await client.query('ROLLBACK');

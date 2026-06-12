@@ -22,12 +22,10 @@ export function AuthPages({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const [waking, setWaking] = useState(false);
 
+  // Réveille Render en arrière-plan (plan gratuit = mise en veille après 15 min)
   useEffect(() => {
-    if (mode !== 'forgot') return;
-    setWaking(true);
-    api.wakeApi().finally(() => setWaking(false));
+    if (mode === 'forgot') api.wakeApi();
   }, [mode]);
 
   const titles: Record<Mode, string> = {
@@ -45,7 +43,7 @@ export function AuthPages({
       setLoading(true);
       try {
         const data = await api.forgotPassword(email.trim());
-        setSuccess(data.message || 'Email envoyé. Vérifiez votre boîte mail et les spams.');
+        setSuccess(data.message || 'Email envoyé. Dans Gmail, recherchez : from:onboarding@resend.dev');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erreur');
       } finally {
@@ -149,9 +147,7 @@ export function AuthPages({
           <button type="submit" disabled={loading}
             className="w-full py-3 rounded-xl disabled:opacity-50 transition-all hover:opacity-90"
             style={{ background: '#4361EE', color: 'white', fontSize: 15, fontWeight: 700 }}>
-            {loading
-              ? (waking ? 'Démarrage du serveur…' : 'Envoi en cours…')
-              : mode === 'forgot' ? 'Envoyer le lien' : 'Enregistrer'}
+            {loading ? 'Envoi en cours…' : mode === 'forgot' ? 'Envoyer le lien' : 'Enregistrer'}
           </button>
         </form>
       </div>
