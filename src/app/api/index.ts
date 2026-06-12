@@ -1,7 +1,9 @@
 import {
   AppState, CurrentUser, Agent, Provider, SubventionConfig, ProviderInvoice,
 } from '../types';
-import { apiFetch, setToken } from './client';
+import { apiFetch, setToken, wakeApi } from './client';
+
+export { wakeApi };
 
 interface LoginResponse {
   token: string;

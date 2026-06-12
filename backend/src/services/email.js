@@ -85,7 +85,7 @@ async function sendViaResend({ to, subject, text, html, attachments = [] }) {
   const from = await resolveResendFrom();
   const htmlBody = html || `<p>${text.replace(/\n/g, '<br>')}</p>`;
 
-  const { data, error } = await resend.emails.send({
+  const sendPromise = resend.emails.send({
     from,
     to: [to],
     subject,
@@ -93,6 +93,11 @@ async function sendViaResend({ to, subject, text, html, attachments = [] }) {
     html: htmlBody,
     attachments: buildResendAttachments(htmlBody, attachments),
   });
+
+  const timeout = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Timeout Resend (15s)')), 15_000);
+  });
+  const { data, error } = await Promise.race([sendPromise, timeout]);
 
   if (error) throw new Error(error.message || 'Erreur Resend');
   return { sent: true, to, provider: 'resend', id: data?.id, from };

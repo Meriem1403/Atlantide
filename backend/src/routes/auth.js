@@ -173,15 +173,21 @@ router.post('/forgot-password', async (req, res) => {
       try {
         await client.query('BEGIN');
         const sync = await syncAgentUserEmail(client, agentRes.rows[0], {
-          sendEmail: true,
+          sendEmail: false,
           forceResend: true,
         });
         await client.query('COMMIT');
-        if (sync.emailResult && !sync.emailResult.sent && !sync.emailResult.skipped) {
-          return res.status(502).json({
-            error: `Échec envoi email : ${sync.emailResult.error || 'erreur inconnue'}`,
-          });
-        }
+
+        const mail = setupPasswordEmail({
+          name: agentRes.rows[0].name,
+          username: deliveryTo,
+          setupUrl: sync.setupUrl,
+          ttlHours: SETUP_TTL_HOURS,
+        });
+        sendMail({ to: deliveryTo, ...mail }).then((r) => {
+          if (!r.sent && !r.skipped) console.error(`Email forgot agent ${deliveryTo}:`, r.error);
+        });
+
         return res.json({
           success: true,
           message: `Email d'activation envoyé à ${deliveryTo}. Vérifiez votre boîte mail et les spams (expéditeur : onboarding@resend.dev).`,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Lock, Mail, ArrowLeft, Ticket } from 'lucide-react';
 import * as api from '../api';
 import { APP_NAME } from '../config/branding';
@@ -22,6 +22,13 @@ export function AuthPages({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [waking, setWaking] = useState(false);
+
+  useEffect(() => {
+    if (mode !== 'forgot') return;
+    setWaking(true);
+    api.wakeApi().finally(() => setWaking(false));
+  }, [mode]);
 
   const titles: Record<Mode, string> = {
     setup: 'Créer votre mot de passe',
@@ -142,7 +149,9 @@ export function AuthPages({
           <button type="submit" disabled={loading}
             className="w-full py-3 rounded-xl disabled:opacity-50 transition-all hover:opacity-90"
             style={{ background: '#4361EE', color: 'white', fontSize: 15, fontWeight: 700 }}>
-            {loading ? 'Envoi…' : mode === 'forgot' ? 'Envoyer le lien' : 'Enregistrer'}
+            {loading
+              ? (waking ? 'Démarrage du serveur…' : 'Envoi en cours…')
+              : mode === 'forgot' ? 'Envoyer le lien' : 'Enregistrer'}
           </button>
         </form>
       </div>
