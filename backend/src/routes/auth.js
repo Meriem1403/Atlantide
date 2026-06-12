@@ -27,11 +27,20 @@ function mapUserResponse(user, token) {
 
 async function findUserByLogin(login) {
   const value = login.trim().toLowerCase();
-  const result = await pool.query(
+  const direct = await pool.query(
     `SELECT * FROM users WHERE LOWER(username) = $1 OR LOWER(email) = $1`,
     [value],
   );
-  return result.rows[0] ?? null;
+  if (direct.rows[0]) return direct.rows[0];
+
+  // Fiche agent mise à jour mais compte users pas encore synchronisé
+  const viaAgent = await pool.query(
+    `SELECT u.* FROM agents a
+     INNER JOIN users u ON u.role = 'agent' AND u.profile_id = a.id
+     WHERE LOWER(a.email) = $1`,
+    [value],
+  );
+  return viaAgent.rows[0] ?? null;
 }
 
 router.post('/login', async (req, res) => {
@@ -153,8 +162,11 @@ router.post('/forgot-password', async (req, res) => {
 
     const user = await findUserByLogin(email);
     if (user) {
-      const to = user.email || user.username;
+      // Toujours envoyer à l'adresse saisie (souvent l'email agent), pas un vieux @dirm.fr en base
+      const deliveryTo = email.trim().toLowerCase();
       const needsSetup = Boolean(user.must_change_password || user.setup_token);
+
+      await pool.query('UPDATE users SET email = $2 WHERE id = $1', [user.id, deliveryTo]);
 
       let mail;
       if (needsSetup) {
@@ -168,7 +180,7 @@ router.post('/forgot-password', async (req, res) => {
         const setupUrl = `${FRONTEND_URL}/set-password?token=${setupToken}`;
         mail = setupPasswordEmail({
           name: user.name,
-          username: to,
+          username: deliveryTo,
           setupUrl,
           ttlHours: SETUP_TTL_HOURS,
         });
@@ -184,9 +196,9 @@ router.post('/forgot-password', async (req, res) => {
         mail = resetPasswordEmail({ name: user.name, resetUrl, ttlHours: RESET_TTL_HOURS });
       }
 
-      const result = await sendMail({ to, ...mail });
+      const result = await sendMail({ to: deliveryTo, ...mail });
       if (!result.sent && !result.skipped) {
-        console.error(`Email auth ${to}:`, result.error);
+        console.error(`Email auth ${deliveryTo}:`, result.error);
         return res.status(502).json({ error: `Échec envoi email : ${result.error || 'erreur inconnue'}` });
       }
     }
