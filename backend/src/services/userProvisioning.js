@@ -14,9 +14,12 @@ function slugify(str) {
     .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-async function uniqueUsername(client, email, code) {
+async function uniqueUsername(client, email, code, excludeUserId = null) {
   const base = email.toLowerCase();
-  const taken = await client.query('SELECT id FROM users WHERE username = $1 OR email = $1', [base]);
+  const taken = await client.query(
+    'SELECT id FROM users WHERE (username = $1 OR email = $1) AND ($2::text IS NULL OR id != $2)',
+    [base, excludeUserId],
+  );
   if (!taken.rows.length) return base;
   return `${base.split('@')[0]}.${(code || 'agent').toLowerCase()}@dirm.fr`;
 }
@@ -47,11 +50,11 @@ export async function provisionAgentUser(client, agent, { sendEmail = true } = {
 
   let emailResult = null;
   if (sendEmail) {
-    const mail = setupPasswordEmail({ name: agent.name, username, setupUrl, ttlHours: SETUP_TTL_HOURS });
+    const mail = setupPasswordEmail({ name: agent.name, username: email, setupUrl, ttlHours: SETUP_TTL_HOURS });
     emailResult = await sendMail({ to: email, ...mail });
   }
 
-  return { skipped: false, userId, username, email, setupUrl, emailResult };
+  return { skipped: false, userId, username, email, loginId: email, setupUrl, emailResult };
 }
 
 /** Met à jour l'email du compte agent et renvoie un lien d'activation si demandé. */
@@ -69,13 +72,15 @@ export async function syncAgentUserEmail(client, agent, { sendEmail = false, for
 
   const user = existing.rows[0];
   const emailChanged = user.email?.toLowerCase() !== email;
-  const username = await uniqueUsername(client, email, agent.code || 'agent');
+  const username = await uniqueUsername(client, email, agent.code || 'agent', user.id);
+  const loginId = email;
   const setupToken = crypto.randomBytes(32).toString('hex');
   const expires = new Date(Date.now() + SETUP_TTL_HOURS * 3600 * 1000);
   const setupUrl = `${FRONTEND_URL}/set-password?token=${setupToken}`;
 
   await client.query(
-    `UPDATE users SET email = $1, username = $2, setup_token = $3, setup_token_expires = $4, must_change_password = true
+    `UPDATE users SET email = $1, username = $2, setup_token = $3, setup_token_expires = $4, must_change_password = true,
+     reset_token = NULL, reset_token_expires = NULL
      WHERE id = $5`,
     [email, username, setupToken, expires, user.id],
   );
@@ -83,7 +88,7 @@ export async function syncAgentUserEmail(client, agent, { sendEmail = false, for
   const shouldEmail = sendEmail && (emailChanged || forceResend);
   let emailResult = null;
   if (shouldEmail) {
-    const mail = setupPasswordEmail({ name: agent.name, username, setupUrl, ttlHours: SETUP_TTL_HOURS });
+    const mail = setupPasswordEmail({ name: agent.name, username: loginId, setupUrl, ttlHours: SETUP_TTL_HOURS });
     emailResult = await sendMail({ to: email, ...mail });
   }
 
