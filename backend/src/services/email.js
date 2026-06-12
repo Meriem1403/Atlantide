@@ -1,9 +1,14 @@
 import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import pool from '../config/database.js';
 import { APP_NAME } from '../config/branding.js';
 import { getEmailLogoAttachment } from './emailBranding.js';
 
 const enabled = process.env.MAIL_ENABLED !== 'false';
+
+function useResend() {
+  return Boolean(process.env.RESEND_API_KEY?.trim());
+}
 
 async function resolveMailFrom() {
   if (process.env.MAIL_FROM) return process.env.MAIL_FROM;
@@ -15,6 +20,24 @@ async function resolveMailFrom() {
     // ignore
   }
   return `${APP_NAME} <noreply@ticketsrepas.local>`;
+}
+
+/** Adresse expéditrice Resend (domaine vérifié ou onboarding@resend.dev). */
+async function resolveResendFrom() {
+  if (process.env.RESEND_FROM?.trim()) return process.env.RESEND_FROM.trim();
+
+  const mailFrom = await resolveMailFrom();
+  const addrMatch = mailFrom.match(/<([^>]+)>/);
+  const addr = addrMatch?.[1]?.toLowerCase() || mailFrom.toLowerCase();
+
+  // Gmail / adresses non vérifiées chez Resend → adresse de test Resend
+  if (addr.endsWith('@gmail.com') || addr.endsWith('@googlemail.com') || addr.includes('@ticketsrepas.local')) {
+    const nameMatch = mailFrom.match(/^([^<]+)</);
+    const name = nameMatch ? nameMatch[1].trim() : APP_NAME;
+    return `${name} <onboarding@resend.dev>`;
+  }
+
+  return mailFrom;
 }
 
 const transporter = nodemailer.createTransport({
@@ -30,38 +53,101 @@ const transporter = nodemailer.createTransport({
   } : undefined,
 });
 
-export async function verifySmtp() {
+function buildResendAttachments(extraAttachments = []) {
+  const logo = getEmailLogoAttachment();
+  const resendAttachments = [];
+
+  if (logo) {
+    resendAttachments.push({
+      filename: logo.filename,
+      content: logo.content,
+      content_id: logo.cid,
+    });
+  }
+
+  for (const a of extraAttachments) {
+    if (a.cid) {
+      resendAttachments.push({
+        filename: a.filename || 'attachment',
+        content: a.content,
+        content_id: a.cid,
+      });
+    } else {
+      resendAttachments.push({
+        filename: a.filename || 'attachment',
+        content: a.content,
+      });
+    }
+  }
+
+  return resendAttachments.length ? resendAttachments : undefined;
+}
+
+async function sendViaResend({ to, subject, text, html, attachments = [] }) {
+  const resend = new Resend(process.env.RESEND_API_KEY.trim());
+  const from = await resolveResendFrom();
+  const htmlBody = html || `<p>${text.replace(/\n/g, '<br>')}</p>`;
+
+  const { data, error } = await resend.emails.send({
+    from,
+    to: [to],
+    subject,
+    text,
+    html: htmlBody,
+    attachments: buildResendAttachments(attachments),
+  });
+
+  if (error) throw new Error(error.message || 'Erreur Resend');
+  return { sent: true, to, provider: 'resend', id: data?.id, from };
+}
+
+async function sendViaSmtp({ to, subject, text, html, attachments = [] }) {
+  const logo = getEmailLogoAttachment();
+  const allAttachments = [...attachments];
+  if (logo && html?.includes(`cid:${logo.cid}`) && !allAttachments.some((a) => a.cid === logo.cid)) {
+    allAttachments.push(logo);
+  }
+
+  await transporter.sendMail({
+    from: await resolveMailFrom(),
+    to,
+    subject,
+    text,
+    html: html || `<p>${text.replace(/\n/g, '<br>')}</p>`,
+    attachments: allAttachments.length ? allAttachments : undefined,
+  });
+  return { sent: true, to, provider: 'smtp' };
+}
+
+export async function verifyEmail() {
   if (!enabled) return { ok: false, error: 'MAIL_ENABLED est désactivé' };
-  if (!process.env.SMTP_USER?.trim()) return { ok: false, error: 'SMTP_USER manquant' };
-  if (!process.env.SMTP_PASS?.trim()) return { ok: false, error: 'SMTP_PASS manquant' };
+
+  if (useResend()) {
+    return { ok: true, provider: 'resend' };
+  }
+
+  if (!process.env.SMTP_USER?.trim()) return { ok: false, error: 'SMTP_USER manquant (ou définissez RESEND_API_KEY)' };
+  if (!process.env.SMTP_PASS?.trim()) return { ok: false, error: 'SMTP_PASS manquant (ou définissez RESEND_API_KEY)' };
   try {
     await transporter.verify();
-    return { ok: true };
+    return { ok: true, provider: 'smtp' };
   } catch (err) {
     console.error('Erreur vérification SMTP:', err.message);
     return { ok: false, error: err.message };
   }
 }
 
+/** @deprecated utilisez verifyEmail */
+export const verifySmtp = verifyEmail;
+
 export async function sendMail({ to, subject, text, html, attachments = [] }) {
   if (!enabled) return { sent: false, skipped: true, reason: 'disabled' };
   if (!to) return { sent: false, skipped: true, reason: 'no_recipient' };
   try {
-    const logo = getEmailLogoAttachment();
-    const allAttachments = [...attachments];
-    if (logo && html?.includes(`cid:${logo.cid}`) && !allAttachments.some((a) => a.cid === logo.cid)) {
-      allAttachments.push(logo);
+    if (useResend()) {
+      return await sendViaResend({ to, subject, text, html, attachments });
     }
-
-    await transporter.sendMail({
-      from: await resolveMailFrom(),
-      to,
-      subject,
-      text,
-      html: html || `<p>${text.replace(/\n/g, '<br>')}</p>`,
-      attachments: allAttachments.length ? allAttachments : undefined,
-    });
-    return { sent: true, to };
+    return await sendViaSmtp({ to, subject, text, html, attachments });
   } catch (err) {
     console.error('Erreur envoi email:', err.message);
     return { sent: false, error: err.message };
