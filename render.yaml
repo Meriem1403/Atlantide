@@ -30,6 +30,10 @@ services:
       - key: FRONTEND_URL
         sync: false
       - key: MAIL_ENABLED
-        value: "false"
+        value: "true"
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
       - key: DATADOC_PATH
         value: ../datadoc
