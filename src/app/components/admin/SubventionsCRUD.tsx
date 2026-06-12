@@ -4,6 +4,7 @@ import { SubventionConfig, Agent } from '../../types';
 import { Pagination } from '../shared/Pagination';
 import { AdminRoute } from './AdminApp';
 import { AdminFormLayout } from '../shared/AdminFormLayout';
+import { FormInput } from '../shared/AdminFormFields';
 
 const PER_PAGE = 8;
 
@@ -63,11 +64,6 @@ function SubventionForm({
     navigate('subventions');
   };
 
-  const Input = (p: React.InputHTMLAttributes<HTMLInputElement>) => (
-    <input {...p} className="w-full rounded-xl border border-border px-4 py-2.5 outline-none focus:border-primary transition-colors"
-      style={{ background: '#F9FAFB', fontSize: 14, color: '#111827', ...p.style }} />
-  );
-
   return (
     <AdminFormLayout title={title} backLabel="Retour aux subventions" onBack={() => navigate('subventions')} maxWidth="4xl">
         <div className="space-y-5">
@@ -79,7 +75,7 @@ function SubventionForm({
               <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6, color: '#374151' }}>
                 Nom de la configuration <span style={{ color: '#E63946' }}>*</span>
               </label>
-              <Input
+              <FormInput
                 value={form.label}
                 onChange={e => f('label', e.target.value)}
                 placeholder="Ex : Standard 2026, Direction RH, Cadres supérieurs…"
@@ -111,13 +107,13 @@ function SubventionForm({
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6, color: '#374151' }}>Valeur faciale (€)</label>
-                <Input type="number" step="0.10" min="1" value={form.faceValue} onChange={e => f('faceValue', Number(e.target.value))} />
+                <FormInput type="number" step="0.10" min="1" value={form.faceValue} onChange={e => f('faceValue', Number(e.target.value))} />
               </div>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6, color: '#374151' }}>
                   Subvention employeur (€) — <span style={{ color: '#4361EE' }}>{subsidyPct}%</span>
                 </label>
-                <Input type="number" step="0.10" min="0" max={form.faceValue} value={form.subsidy} onChange={e => f('subsidy', Number(e.target.value))} />
+                <FormInput type="number" step="0.10" min="0" max={form.faceValue} value={form.subsidy} onChange={e => f('subsidy', Number(e.target.value))} />
               </div>
             </div>
             <div>

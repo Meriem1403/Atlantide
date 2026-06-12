@@ -45,12 +45,16 @@ export async function provisionAgentUser(client, agent, { sendEmail = true } = {
     [userId, username, email, passwordHash, agent.id, agent.name, setupToken, expires],
   );
 
+  let emailResult = null;
   if (sendEmail) {
     const mail = setupPasswordEmail({ name: agent.name, username, setupUrl, ttlHours: SETUP_TTL_HOURS });
-    await sendMail({ to: email, ...mail });
+    sendMail({ to: email, ...mail }).then((r) => {
+      if (!r.sent && !r.skipped) console.error(`Email activation agent ${email}:`, r.error);
+    });
+    emailResult = { sent: true, queued: true, to: email };
   }
 
-  return { skipped: false, userId, username, email, setupUrl };
+  return { skipped: false, userId, username, email, setupUrl, emailResult };
 }
 
 /** Met à jour l'email du compte agent et renvoie un lien d'activation si demandé. */
@@ -80,12 +84,16 @@ export async function syncAgentUserEmail(client, agent, { sendEmail = false, for
   );
 
   const shouldEmail = sendEmail && (emailChanged || forceResend);
+  let emailResult = null;
   if (shouldEmail) {
     const mail = setupPasswordEmail({ name: agent.name, username, setupUrl, ttlHours: SETUP_TTL_HOURS });
-    await sendMail({ to: email, ...mail });
+    sendMail({ to: email, ...mail }).then((r) => {
+      if (!r.sent && !r.skipped) console.error(`Email activation agent ${email}:`, r.error);
+    });
+    emailResult = { sent: true, queued: true, to: email };
   }
 
-  return { updated: true, emailChanged, email, setupUrl, emailed: shouldEmail };
+  return { updated: true, emailChanged, email, setupUrl, emailed: shouldEmail, emailResult };
 }
 
 export async function provisionProviderUser(client, provider, { sendEmail = true, password = DEFAULT_PROVIDER_PASSWORD } = {}) {

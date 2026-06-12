@@ -4,6 +4,7 @@ import { Provider } from '../../types';
 import { Pagination } from '../shared/Pagination';
 import { AdminRoute } from './AdminApp';
 import { AdminFormLayout } from '../shared/AdminFormLayout';
+import { FormField, FormInput } from '../shared/AdminFormFields';
 
 const PER_PAGE = 9;
 
@@ -36,36 +37,25 @@ function PageHeader({ title, sub, onBack }: { title: string; sub?: string; onBac
 
 function ProviderForm({
   title, initial, onSubmit, navigate,
-}: { title: string; initial: Omit<Provider, 'id' | 'createdAt'>; onSubmit: (f: Omit<Provider, 'id' | 'createdAt'>) => void; navigate: (r: AdminRoute) => void; }) {
+}: { title: string; initial: Omit<Provider, 'id' | 'createdAt'>; onSubmit: (f: Omit<Provider, 'id' | 'createdAt'>) => Promise<void>; navigate: (r: AdminRoute) => void; }) {
   const [form, setForm] = useState(initial);
+  const [saving, setSaving] = useState(false);
   const f = (k: keyof typeof form, v: string | boolean) => setForm(p => ({ ...p, [k]: v }));
-  const Input = (p: React.InputHTMLAttributes<HTMLInputElement>) => (
-    <input {...p} className="w-full rounded-xl border border-border px-4 py-2.5 outline-none focus:border-primary transition-colors"
-      style={{ background: '#F9FAFB', fontSize: 14, color: '#111827', ...p.style }} />
-  );
-  const Field = ({ label, req, children }: { label: string; req?: boolean; children: React.ReactNode }) => (
-    <div>
-      <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6, color: '#374151' }}>
-        {label}{req && <span style={{ color: '#E63946' }}> *</span>}
-      </label>
-      {children}
-    </div>
-  );
   return (
     <AdminFormLayout title={title} backLabel="Retour aux prestataires" onBack={() => navigate('providers')} maxWidth="4xl">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white rounded-2xl p-6 lg:p-8 space-y-5" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid rgba(17,24,39,0.07)' }}>
-          <Field label="Nom du restaurant" req><Input value={form.name} onChange={e => f('name', e.target.value)} placeholder="La Bonne Fourchette" /></Field>
-          <Field label="Adresse complète" req><Input value={form.address} onChange={e => f('address', e.target.value)} placeholder="12 rue du Commerce, 75015 Paris" /></Field>
-          <Field label="Numéro SIRET" req><Input value={form.siret} onChange={e => f('siret', e.target.value)} placeholder="123 456 789 00012" /></Field>
+          <FormField label="Nom du restaurant" req><FormInput value={form.name} onChange={e => f('name', e.target.value)} placeholder="La Bonne Fourchette" /></FormField>
+          <FormField label="Adresse complète" req><FormInput value={form.address} onChange={e => f('address', e.target.value)} placeholder="12 rue du Commerce, 75015 Paris" /></FormField>
+          <FormField label="Numéro SIRET" req><FormInput value={form.siret} onChange={e => f('siret', e.target.value)} placeholder="123 456 789 00012" /></FormField>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Email"><Input type="email" value={form.email} onChange={e => f('email', e.target.value)} placeholder="contact@resto.fr" /></Field>
-            <Field label="Téléphone"><Input value={form.phone} onChange={e => f('phone', e.target.value)} placeholder="01 23 45 67 89" /></Field>
+            <FormField label="Email"><FormInput type="email" value={form.email} onChange={e => f('email', e.target.value)} placeholder="contact@resto.fr" /></FormField>
+            <FormField label="Téléphone"><FormInput value={form.phone} onChange={e => f('phone', e.target.value)} placeholder="01 23 45 67 89" /></FormField>
           </div>
         </div>
         <div className="space-y-4">
           <div className="bg-white rounded-2xl p-6" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid rgba(17,24,39,0.07)' }}>
-            <Field label="Statut">
+            <FormField label="Statut">
               <div className="flex gap-3">
                 {[true, false].map(v => (
                   <button key={String(v)} onClick={() => f('active', v)} className="flex-1 py-2.5 rounded-xl border-2 transition-all"
@@ -74,13 +64,14 @@ function ProviderForm({
                   </button>
                 ))}
               </div>
-            </Field>
+            </FormField>
           </div>
           <div className="flex flex-col gap-3">
-            <button onClick={() => { onSubmit(form); navigate('providers'); }} disabled={!form.name || !form.siret}
+            <button type="button" onClick={async () => { setSaving(true); try { await onSubmit(form); navigate('providers'); } finally { setSaving(false); } }}
+              disabled={saving || !form.name || !form.siret}
               className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl disabled:opacity-40 transition-all hover:opacity-90"
               style={{ background: '#4361EE', color: 'white', fontSize: 14, fontWeight: 600 }}>
-              <Save className="w-4 h-4" /> Enregistrer
+              <Save className="w-4 h-4" /> {saving ? 'Enregistrement…' : 'Enregistrer'}
             </button>
             <button onClick={() => navigate('providers')} className="px-5 py-3 rounded-xl border border-border bg-white" style={{ fontSize: 14, fontWeight: 500 }}>Annuler</button>
           </div>

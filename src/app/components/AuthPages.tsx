@@ -38,7 +38,7 @@ export function AuthPages({
       setLoading(true);
       try {
         await api.forgotPassword(email.trim());
-        setSuccess('Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.');
+        setSuccess('Si un compte existe avec cet email, un lien de réinitialisation a été envoyé. Vérifiez aussi les spams (l\'envoi peut prendre une minute).');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erreur');
       } finally {
