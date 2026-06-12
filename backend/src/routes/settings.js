@@ -2,6 +2,7 @@ import { Router } from 'express';
 import pool from '../config/database.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { sendMail, verifyEmail } from '../services/email.js';
+import { setupPasswordEmail } from '../services/emailTemplates.js';
 import { APP_NAME } from '../config/branding.js';
 
 const router = Router();
@@ -39,10 +40,17 @@ router.post('/test-email', authenticateToken, requireRole('admin'), async (req, 
     const verify = await verifyEmail();
     if (!verify.ok) return res.status(400).json({ error: verify.error });
 
+    const mail = setupPasswordEmail({
+      name: 'Test',
+      username: to,
+      setupUrl: `${process.env.FRONTEND_URL || 'https://atlantide.netlify.app'}/set-password?token=test`,
+      ttlHours: 72,
+    });
     const result = await sendMail({
       to,
-      subject: `Test email — ${APP_NAME}`,
-      text: `Ceci est un email de test envoyé depuis ${APP_NAME}. Si vous le recevez, la configuration email (${verify.provider || 'resend'}) est correcte.`,
+      subject: mail.subject,
+      text: mail.text,
+      html: mail.html,
     });
     if (!result.sent) {
       return res.status(502).json({ error: result.error || 'Échec envoi', result });

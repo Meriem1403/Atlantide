@@ -48,10 +48,7 @@ export async function provisionAgentUser(client, agent, { sendEmail = true } = {
   let emailResult = null;
   if (sendEmail) {
     const mail = setupPasswordEmail({ name: agent.name, username, setupUrl, ttlHours: SETUP_TTL_HOURS });
-    sendMail({ to: email, ...mail }).then((r) => {
-      if (!r.sent && !r.skipped) console.error(`Email activation agent ${email}:`, r.error);
-    });
-    emailResult = { sent: true, queued: true, to: email };
+    emailResult = await sendMail({ to: email, ...mail });
   }
 
   return { skipped: false, userId, username, email, setupUrl, emailResult };
@@ -87,10 +84,7 @@ export async function syncAgentUserEmail(client, agent, { sendEmail = false, for
   let emailResult = null;
   if (shouldEmail) {
     const mail = setupPasswordEmail({ name: agent.name, username, setupUrl, ttlHours: SETUP_TTL_HOURS });
-    sendMail({ to: email, ...mail }).then((r) => {
-      if (!r.sent && !r.skipped) console.error(`Email activation agent ${email}:`, r.error);
-    });
-    emailResult = { sent: true, queued: true, to: email };
+    emailResult = await sendMail({ to: email, ...mail });
   }
 
   return { updated: true, emailChanged, email, setupUrl, emailed: shouldEmail, emailResult };
