@@ -11,18 +11,34 @@ export function setToken(token: string | null) {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
-export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+type ApiFetchOptions = RequestInit & { timeoutMs?: number };
+
+export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
+  const { timeoutMs = 90_000, ...fetchOptions } = options;
   const token = getToken();
   const headers: Record<string, string> = {
-  ...(options.headers as Record<string, string> | undefined),
+    ...(fetchOptions.headers as Record<string, string> | undefined),
   };
 
-  if (options.body && !headers['Content-Type']) {
+  if (fetchOptions.body && !headers['Content-Type']) {
     headers['Content-Type'] = 'application/json';
   }
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { ...fetchOptions, headers, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error('Le serveur met trop de temps à répondre (démarrage Render). Attendez 30 secondes et réessayez.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (res.status === 204) return undefined as T;
 
@@ -31,4 +47,12 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     throw new Error(data.error || `Erreur HTTP ${res.status}`);
   }
   return data as T;
+}
+
+export async function wakeApi(): Promise<void> {
+  try {
+    await apiFetch('/health', { timeoutMs: 90_000 });
+  } catch {
+    // ignore — le but est juste de réveiller Render
+  }
 }
