@@ -35,5 +35,7 @@ services:
         sync: false
       - key: RESEND_FROM
         sync: false
+      - key: RESEND_REPLY_TO
+        sync: false
       - key: DATADOC_PATH
         value: ../datadoc

@@ -51,6 +51,7 @@ router.post('/test-email', authenticateToken, requireRole('admin'), async (req, 
       subject: mail.subject,
       text: mail.text,
       html: mail.html,
+      transactional: true,
     });
     if (!result.sent) {
       return res.status(502).json({ error: result.error || 'Échec envoi', result });

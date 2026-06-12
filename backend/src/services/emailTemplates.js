@@ -5,6 +5,26 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const BRAND = '#003189';
 const BRAND_LIGHT = '#E8EEF8';
 
+/** Mise en page sobre (meilleure délivrabilité Gmail, sans image inline). */
+function transactionalLayout({ title, bodyHtml, ctaLabel, ctaUrl, footerNote }) {
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="utf-8" /><title>${title}</title></head>
+<body style="margin:0;padding:24px 16px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;background:#ffffff;">
+  <p style="margin:0 0 8px;font-size:13px;color:#6b7280;">${APP_NAME}</p>
+  <h1 style="margin:0 0 20px;font-size:20px;color:#003189;">${title}</h1>
+  ${bodyHtml}
+  ${ctaLabel && ctaUrl ? `
+  <p style="margin:24px 0 12px;">
+    <a href="${ctaUrl}" style="color:#003189;font-weight:bold;">${ctaLabel}</a>
+  </p>
+  <p style="margin:0 0 16px;font-size:13px;color:#6b7280;word-break:break-all;">${ctaUrl}</p>` : ''}
+  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />
+  <p style="margin:0;font-size:12px;color:#9ca3af;">${footerNote || `Ministère chargé de la Mer et de la Pêche — ${APP_NAME}`}</p>
+</body>
+</html>`;
+}
+
 function layout({ preheader, title, bodyHtml, ctaLabel, ctaUrl, footerNote }) {
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -54,40 +74,56 @@ function layout({ preheader, title, bodyHtml, ctaLabel, ctaUrl, footerNote }) {
 
 export function setupPasswordEmail({ name, username, setupUrl, ttlHours }) {
   const title = 'Activez votre espace agent';
-  const html = layout({
-    preheader: 'Créez votre mot de passe pour accéder à vos tickets restaurant.',
+  const bodyHtml = `
+    <p style="margin:0 0 12px;">Bonjour ${name},</p>
+    <p style="margin:0 0 12px;">Votre compte ${APP_NAME} a été créé. Définissez votre mot de passe pour accéder à vos tickets restaurant.</p>
+    <p style="margin:0 0 12px;"><strong>Identifiant :</strong> ${username}</p>
+    <p style="margin:0 0 12px;">Lien valable ${ttlHours} heures.</p>`;
+  const html = transactionalLayout({
     title,
-    bodyHtml: `
-      <p style="margin:0 0 16px;">Bonjour <strong>${name}</strong>,</p>
-      <p style="margin:0 0 16px;">Votre compte sur la plateforme <strong>${APP_NAME}</strong> a été créé. Pour consulter et télécharger vos tickets, définissez dès maintenant votre mot de passe personnel.</p>
-      <table role="presentation" width="100%" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;margin:0 0 16px;">
-        <tr><td style="padding:16px 18px;">
-          <div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:0.08em;font-weight:600;">Identifiant de connexion</div>
-          <div style="font-size:16px;font-weight:700;color:#111827;margin-top:6px;">${username}</div>
-        </td></tr>
-      </table>
-      <p style="margin:0;color:#6B7280;font-size:13px;">Ce lien est valable <strong>${ttlHours} heures</strong>.</p>`,
+    bodyHtml,
     ctaLabel: 'Créer mon mot de passe',
     ctaUrl: setupUrl,
   });
-  const text = `Bonjour ${name},\n\nCréez votre mot de passe : ${setupUrl}\n\nIdentifiant : ${username}\n\nLien valable ${ttlHours}h.`;
-  return { subject: `${APP_NAME} — Activez votre compte agent`, html, text };
+  const text = [
+    `Bonjour ${name},`,
+    '',
+    `Votre compte ${APP_NAME} a été créé.`,
+    `Identifiant : ${username}`,
+    '',
+    `Créez votre mot de passe :`,
+    setupUrl,
+    '',
+    `Lien valable ${ttlHours} heures.`,
+    '',
+    `— ${APP_NAME}`,
+  ].join('\n');
+  return { subject: `[${APP_NAME}] Activez votre compte agent`, html, text };
 }
 
 export function resetPasswordEmail({ name, resetUrl, ttlHours }) {
   const title = 'Réinitialisation du mot de passe';
-  const html = layout({
-    preheader: `Demande de réinitialisation de votre mot de passe ${APP_NAME}.`,
+  const bodyHtml = `
+    <p style="margin:0 0 12px;">Bonjour ${name},</p>
+    <p style="margin:0 0 12px;">Demande de réinitialisation de mot de passe pour votre compte ${APP_NAME}.</p>
+    <p style="margin:0 0 12px;">Lien valable ${ttlHours} heures. Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>`;
+  const html = transactionalLayout({
     title,
-    bodyHtml: `
-      <p style="margin:0 0 16px;">Bonjour <strong>${name}</strong>,</p>
-      <p style="margin:0 0 16px;">Nous avons reçu une demande de réinitialisation de mot de passe pour votre compte ${APP_NAME}. Si vous êtes à l'origine de cette demande, cliquez sur le bouton ci-dessous.</p>
-      <p style="margin:0;color:#6B7280;font-size:13px;">Lien valable <strong>${ttlHours} heures</strong>. Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>`,
+    bodyHtml,
     ctaLabel: 'Réinitialiser mon mot de passe',
     ctaUrl: resetUrl,
   });
-  const text = `Bonjour ${name},\n\nRéinitialisez votre mot de passe : ${resetUrl}\n\nLien valable ${ttlHours}h.`;
-  return { subject: `${APP_NAME} — Réinitialisation du mot de passe`, html, text };
+  const text = [
+    `Bonjour ${name},`,
+    '',
+    `Réinitialisez votre mot de passe :`,
+    resetUrl,
+    '',
+    `Lien valable ${ttlHours} heures.`,
+    '',
+    `— ${APP_NAME}`,
+  ].join('\n');
+  return { subject: `[${APP_NAME}] Réinitialisation du mot de passe`, html, text };
 }
 
 export function ticketsGeneratedEmail({ name, orgName, count, monthLabel }) {

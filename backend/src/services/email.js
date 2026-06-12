@@ -80,18 +80,45 @@ function buildResendAttachments(html, extraAttachments = []) {
   return resendAttachments.length ? resendAttachments : undefined;
 }
 
-async function sendViaResend({ to, subject, text, html, attachments = [] }) {
+async function resolveReplyTo() {
+  if (process.env.RESEND_REPLY_TO?.trim()) return process.env.RESEND_REPLY_TO.trim();
+  try {
+    const res = await pool.query('SELECT notification_email FROM settings WHERE id = 1');
+    const addr = res.rows[0]?.notification_email?.trim();
+    if (addr && addr.includes('@')) return addr;
+  } catch {
+    // ignore
+  }
+  return undefined;
+}
+
+function isSandboxFrom(from) {
+  return from.includes('@resend.dev');
+}
+
+async function sendViaResend({ to, subject, text, html, attachments = [], transactional = false }) {
   const resend = new Resend(process.env.RESEND_API_KEY.trim());
   const from = await resolveResendFrom();
   const htmlBody = html || `<p>${text.replace(/\n/g, '<br>')}</p>`;
+  const replyTo = await resolveReplyTo();
+
+  if (isSandboxFrom(from)) {
+    console.warn('Resend : expéditeur sandbox (@resend.dev) — risque élevé de classement en spam. Vérifiez un domaine sur resend.com/domains.');
+  }
 
   const sendPromise = resend.emails.send({
     from,
     to: [to],
+    replyTo: replyTo || undefined,
     subject,
     text,
     html: htmlBody,
-    attachments: buildResendAttachments(htmlBody, attachments),
+    tags: [{ name: 'app', value: 'atlantide' }],
+    headers: {
+      'X-Entity-Ref-ID': `atlantide-${Date.now()}`,
+    },
+    // Pas de pièces jointes inline sur les mails transactionnels (meilleure délivrabilité)
+    attachments: transactional ? undefined : buildResendAttachments(htmlBody, attachments),
   });
 
   const timeout = new Promise((_, reject) => {
@@ -142,12 +169,12 @@ export async function verifyEmail() {
 /** @deprecated utilisez verifyEmail */
 export const verifySmtp = verifyEmail;
 
-export async function sendMail({ to, subject, text, html, attachments = [] }) {
+export async function sendMail({ to, subject, text, html, attachments = [], transactional = false }) {
   if (!enabled) return { sent: false, skipped: true, reason: 'disabled' };
   if (!to) return { sent: false, skipped: true, reason: 'no_recipient' };
   try {
     if (useResend()) {
-      return await sendViaResend({ to, subject, text, html, attachments });
+      return await sendViaResend({ to, subject, text, html, attachments, transactional });
     }
     return await sendViaSmtp({ to, subject, text, html, attachments });
   } catch (err) {
