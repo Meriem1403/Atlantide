@@ -37,8 +37,8 @@ export function AuthPages({
     if (mode === 'forgot') {
       setLoading(true);
       try {
-        await api.forgotPassword(email.trim());
-        setSuccess('Si un compte existe avec cet email, un lien a été envoyé (activation ou réinitialisation). Vérifiez votre boîte mail et les spams — cherchez « Atlantide » ou « onboarding@resend.dev ».');
+        const data = await api.forgotPassword(email.trim());
+        setSuccess(data.message || 'Email envoyé. Vérifiez votre boîte mail et les spams.');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erreur');
       } finally {
@@ -92,7 +92,7 @@ export function AuthPages({
 
         {mode === 'forgot' && (
           <p style={{ fontSize: 14, color: '#6B7280', marginBottom: 20 }}>
-            Saisissez l&apos;email renseigné sur votre fiche agent. Vous recevrez un lien pour créer ou réinitialiser votre mot de passe.
+            Saisissez exactement l&apos;email de votre fiche agent (ex. celui affiché dans l&apos;admin Atlantide). Un email d&apos;activation vous sera envoyé.
           </p>
         )}
 
