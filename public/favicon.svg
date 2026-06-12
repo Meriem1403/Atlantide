@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Atlantide">
+  <rect width="32" height="32" rx="7" fill="#4361EE"/>
+  <path
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="1.75"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    d="M10 11.5h12a2 2 0 0 1 2 2v1.25a1.25 1.25 0 0 0 0 2.5V20a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-1.25a1.25 1.25 0 0 0 0-2.5V13.5a2 2 0 0 1 2-2z"
+  />
+  <path
+    stroke="#ffffff"
+    stroke-width="1.5"
+    stroke-dasharray="2.5 2.5"
+    stroke-linecap="round"
+    d="M16 11.5v11"
+  />
+</svg>
