@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import JSZip from 'jszip';
 import * as QRCode from 'qrcode';
 import { Ticket } from '../../types';
 
@@ -118,4 +119,78 @@ export async function downloadBatchTicketsPDF(
     await buildTicketPage(pdf, tickets[i], orgName, orgLogo, i);
   }
   pdf.save(fileName);
+}
+
+export function sanitizePathSegment(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[/\\?%*:|"<>]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80) || 'Sans service';
+}
+
+export interface ServiceTicketGroup {
+  serviceName: string;
+  tickets: Ticket[];
+}
+
+export async function buildTicketsPdfBlob(
+  tickets: Ticket[],
+  orgName: string,
+  orgLogo = '',
+): Promise<Blob> {
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [60, 85] });
+  for (let i = 0; i < tickets.length; i++) {
+    await buildTicketPage(pdf, tickets[i], orgName, orgLogo, i);
+  }
+  return pdf.output('blob');
+}
+
+function triggerBlobDownload(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function downloadTicketsZipByService(
+  groups: ServiceTicketGroup[],
+  orgName: string,
+  orgLogo = '',
+  zipFileName = 'tickets-par-service.zip',
+  onProgress?: (done: number, total: number, serviceName: string) => void,
+) {
+  const zip = new JSZip();
+  const folderNames = new Map<string, number>();
+
+  const nonEmpty = groups.filter(g => g.tickets.length > 0);
+  for (let i = 0; i < nonEmpty.length; i++) {
+    const group = nonEmpty[i];
+    onProgress?.(i, nonEmpty.length, group.serviceName);
+
+    const base = sanitizePathSegment(group.serviceName);
+    const count = (folderNames.get(base) ?? 0) + 1;
+    folderNames.set(base, count);
+    const folderName = count > 1 ? `${base} (${count})` : base;
+
+    const folder = zip.folder(folderName);
+    if (!folder) continue;
+
+    const batchBlob = await buildTicketsPdfBlob(group.tickets, orgName, orgLogo);
+    folder.file('tickets.pdf', batchBlob);
+
+    for (const ticket of group.tickets) {
+      const ticketBlob = await buildTicketsPdfBlob([ticket], orgName, orgLogo);
+      const agentSlug = sanitizePathSegment(ticket.agentName);
+      folder.file(`${agentSlug} - ${ticket.number}.pdf`, ticketBlob);
+    }
+  }
+
+  onProgress?.(nonEmpty.length, nonEmpty.length, '');
+  const content = await zip.generateAsync({ type: 'blob' });
+  triggerBlobDownload(content, zipFileName);
 }

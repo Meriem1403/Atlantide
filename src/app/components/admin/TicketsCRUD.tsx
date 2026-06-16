@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Plus, Download, Trash2, Search, ChevronLeft, Eye, CheckSquare, Square, Users } from 'lucide-react';
+import { Plus, Download, Trash2, Search, ChevronLeft, Eye, CheckSquare, Square, Users, FolderArchive } from 'lucide-react';
 import { OrgLogo } from '../shared/OrgLogo';
 import { Ticket, Agent, SubventionConfig, AgentMonthlyPlan } from '../../types';
 import { TicketGenerationItem } from '../../api';
 import { Pagination } from '../shared/Pagination';
 import { AdminRoute } from './AdminApp';
-import { downloadTicketPDF, downloadBatchTicketsPDF } from '../shared/pdfUtils';
+import { downloadTicketPDF, downloadBatchTicketsPDF, downloadTicketsZipByService, ServiceTicketGroup } from '../shared/pdfUtils';
 import { TicketVisual } from '../shared/TicketVisual';
 import { AdminFormLayout } from '../shared/AdminFormLayout';
 import { FilterSelect, MonthInput } from '../shared/FilterSelect';
@@ -85,6 +85,234 @@ function buildAgentRows(
       };
     })
     .sort((a, b) => a.service.localeCompare(b.service, 'fr') || a.agent.name.localeCompare(b.agent.name, 'fr'));
+}
+
+function buildAgentServiceMap(
+  agents: Agent[],
+  monthlyPlans: AgentMonthlyPlan[],
+  month: string,
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const agent of agents) {
+    const plan = monthlyPlans.find(p => p.agentId === agent.id && p.month === month);
+    map.set(agent.id, plan?.serviceName ?? agent.department ?? 'Sans service');
+  }
+  return map;
+}
+
+function groupTicketsByService(
+  tickets: Ticket[],
+  agentServiceMap: Map<string, string>,
+  month: string,
+  statusFilter: string,
+  selectedServices: Set<string>,
+): ServiceTicketGroup[] {
+  const byService = new Map<string, Ticket[]>();
+
+  for (const ticket of tickets) {
+    if (ticket.month !== month) continue;
+    if (statusFilter !== 'all' && ticket.status !== statusFilter) continue;
+    const serviceName = agentServiceMap.get(ticket.agentId) ?? 'Sans service';
+    if (!selectedServices.has(serviceName)) continue;
+    if (!byService.has(serviceName)) byService.set(serviceName, []);
+    byService.get(serviceName)!.push(ticket);
+  }
+
+  return [...byService.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0], 'fr'))
+    .map(([serviceName, serviceTickets]) => ({
+      serviceName,
+      tickets: serviceTickets.sort((a, b) => a.agentName.localeCompare(b.agentName, 'fr') || a.number.localeCompare(b.number, 'fr')),
+    }));
+}
+
+// ── Export by service page ────────────────────────────────────────────────────
+function ExportByServicePage({
+  tickets, agents, monthlyPlans = [], orgName, orgLogo, navigate,
+}: {
+  tickets: Ticket[];
+  agents: Agent[];
+  monthlyPlans?: AgentMonthlyPlan[];
+  orgName: string;
+  orgLogo: string;
+  navigate: (r: AdminRoute) => void;
+}) {
+  const months = useMemo(
+    () => [...new Set([...monthlyPlans.map(p => p.month), ...tickets.map(t => t.month)])].sort().reverse(),
+    [monthlyPlans, tickets],
+  );
+  const [month, setMonth] = useState(months[0] ?? '2026-07');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'all' | 'used'>('active');
+  const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set());
+  const [downloading, setDownloading] = useState(false);
+  const [progress, setProgress] = useState('');
+
+  const agentServiceMap = useMemo(
+    () => buildAgentServiceMap(agents, monthlyPlans, month),
+    [agents, monthlyPlans, month],
+  );
+
+  const serviceRows = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const ticket of tickets) {
+      if (ticket.month !== month) continue;
+      if (statusFilter !== 'all' && ticket.status !== statusFilter) continue;
+      const serviceName = agentServiceMap.get(ticket.agentId) ?? 'Sans service';
+      counts.set(serviceName, (counts.get(serviceName) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0], 'fr'))
+      .map(([serviceName, count]) => ({ serviceName, count }));
+  }, [tickets, agentServiceMap, month, statusFilter]);
+
+  useEffect(() => {
+    setSelectedServices(new Set(serviceRows.map(r => r.serviceName)));
+  }, [serviceRows]);
+
+  const selectedCount = useMemo(() => {
+    return groupTicketsByService(tickets, agentServiceMap, month, statusFilter, selectedServices)
+      .reduce((sum, g) => sum + g.tickets.length, 0);
+  }, [tickets, agentServiceMap, month, statusFilter, selectedServices]);
+
+  const toggleService = (serviceName: string) => {
+    setSelectedServices(prev => {
+      const next = new Set(prev);
+      if (next.has(serviceName)) next.delete(serviceName);
+      else next.add(serviceName);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedServices.size === serviceRows.length) {
+      setSelectedServices(new Set());
+    } else {
+      setSelectedServices(new Set(serviceRows.map(r => r.serviceName)));
+    }
+  };
+
+  const handleDownload = async () => {
+    const groups = groupTicketsByService(tickets, agentServiceMap, month, statusFilter, selectedServices);
+    if (groups.length === 0) return;
+
+    setDownloading(true);
+    setProgress('Préparation…');
+    try {
+      await downloadTicketsZipByService(
+        groups,
+        orgName,
+        orgLogo,
+        `tickets-${month}-par-service.zip`,
+        (done, total, serviceName) => {
+          if (serviceName) {
+            setProgress(`Service ${done + 1}/${total} : ${serviceName}`);
+          }
+        },
+      );
+      setProgress('');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden" style={{ background: '#F0F2F7' }}>
+      <PageHeader
+        title="Export par service"
+        sub="Téléchargez un ZIP avec un dossier par service contenant les PDF des tickets"
+        onBack={() => navigate('tickets')}
+      />
+
+      <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-5">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="bg-white rounded-2xl p-5" style={{ border: '1px solid rgba(17,24,39,0.07)' }}>
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>Mois</label>
+            <MonthInput value={month} onChange={e => setMonth(e.target.value)} />
+          </div>
+          <div className="bg-white rounded-2xl p-5" style={{ border: '1px solid rgba(17,24,39,0.07)' }}>
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>Statut des tickets</label>
+            <FilterSelect variant="form" value={statusFilter} onChange={e => setStatusFilter(e.target.value as 'active' | 'all' | 'used')}>
+              <option value="active">Actifs uniquement</option>
+              <option value="all">Tous les statuts</option>
+              <option value="used">Utilisés uniquement</option>
+            </FilterSelect>
+          </div>
+          <div className="bg-white rounded-2xl p-5 flex flex-col justify-between" style={{ border: '1px solid rgba(17,24,39,0.07)' }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Résumé</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: '#4361EE', marginTop: 8 }}>{selectedCount}</div>
+              <div style={{ fontSize: 12, color: '#6B7280' }}>tickets · {selectedServices.size} service(s)</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(17,24,39,0.07)' }}>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+            <h3 style={{ fontSize: 16, fontWeight: 700 }}>Services</h3>
+            <button onClick={toggleAll} className="flex items-center gap-2" style={{ fontSize: 13, fontWeight: 600, color: '#4361EE' }}>
+              {selectedServices.size === serviceRows.length ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+              {selectedServices.size === serviceRows.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+            </button>
+          </div>
+
+          {serviceRows.length === 0 ? (
+            <div className="py-14 text-center" style={{ fontSize: 14, color: '#6B7280' }}>
+              Aucun ticket pour ce mois et ce filtre.
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {serviceRows.map(row => {
+                const checked = selectedServices.has(row.serviceName);
+                return (
+                  <button
+                    key={row.serviceName}
+                    type="button"
+                    onClick={() => toggleService(row.serviceName)}
+                    className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-[#F9FAFB] transition-colors"
+                  >
+                    {checked
+                      ? <CheckSquare className="w-5 h-5 shrink-0" style={{ color: '#4361EE' }} />
+                      : <Square className="w-5 h-5 shrink-0 text-muted-foreground" />}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <FolderArchive className="w-4 h-4 shrink-0" style={{ color: '#6B7280' }} />
+                        <span style={{ fontSize: 14, fontWeight: 600, color: '#111827' }} className="truncate">{row.serviceName}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>
+                        Dossier : {row.serviceName}/
+                      </div>
+                    </div>
+                    <span className="shrink-0 px-3 py-1 rounded-full" style={{ fontSize: 12, fontWeight: 700, background: '#EEF2FF', color: '#4361EE' }}>
+                      {row.count} ticket{row.count > 1 ? 's' : ''}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-2xl p-5" style={{ border: '1px solid rgba(17,24,39,0.07)' }}>
+          <h4 style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Contenu du ZIP</h4>
+          <p style={{ fontSize: 13, color: '#6B7280', lineHeight: 1.6 }}>
+            Chaque service aura son propre dossier (nom du service). À l&apos;intérieur :
+            un PDF regroupé <code style={{ fontSize: 12 }}>tickets.pdf</code> et un PDF par ticket
+            nommé <code style={{ fontSize: 12 }}>Agent - TR-….pdf</code>.
+          </p>
+        </div>
+
+        <button
+          onClick={handleDownload}
+          disabled={downloading || selectedCount === 0}
+          className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl transition-all hover:opacity-90 disabled:opacity-50"
+          style={{ background: '#4361EE', color: 'white', fontSize: 15, fontWeight: 700 }}
+        >
+          <Download className="w-5 h-5" />
+          {downloading ? (progress || 'Génération du ZIP…') : `Télécharger le ZIP (${selectedCount} tickets)`}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ── Generate page ─────────────────────────────────────────────────────────────
@@ -405,6 +633,17 @@ export function TicketsCRUD({ route, navigate, tickets, agents, subventions, mon
     setPage(1);
   };
 
+  if (route === 'tickets/export') return (
+    <ExportByServicePage
+      tickets={tickets}
+      agents={agents}
+      monthlyPlans={monthlyPlans}
+      orgName={orgName}
+      orgLogo={orgLogo}
+      navigate={navigate}
+    />
+  );
+
   if (route === 'tickets/generate') return (
     <GeneratePage agents={agents} subventions={subventions} monthlyPlans={monthlyPlans} tickets={tickets}
       onGenerateBatch={onGenerateBatch} navigate={navigate} />
@@ -448,6 +687,11 @@ export function TicketsCRUD({ route, navigate, tickets, agents, subventions, mon
             </p>
           </div>
           <div className="flex gap-2">
+            <button onClick={() => navigate('tickets/export')}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border bg-white hover:border-primary transition-all"
+              style={{ fontSize: 13, color: '#4361EE', fontWeight: 500 }}>
+              <FolderArchive className="w-4 h-4" /> Export par service
+            </button>
             <button onClick={handleDownloadAll} disabled={downloading || filtered.length === 0}
               className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border bg-white hover:border-primary transition-all disabled:opacity-40"
               style={{ fontSize: 13, color: '#4361EE', fontWeight: 500 }}>
