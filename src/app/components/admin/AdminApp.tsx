@@ -25,7 +25,7 @@ import { APP_NAME } from '../../config/branding';
 export type AdminRoute =
   | 'dashboard'
   | 'agents' | 'agents/new' | `agents/edit/${string}`
-  | 'tickets' | 'tickets/generate' | `tickets/view/${string}`
+  | 'tickets' | 'tickets/generate' | 'tickets/export' | `tickets/view/${string}`
   | 'subventions' | 'subventions/new' | `subventions/edit/${string}`
   | 'providers' | 'providers/new' | `providers/edit/${string}`
   | 'invoices' | `invoices/view/${string}`
