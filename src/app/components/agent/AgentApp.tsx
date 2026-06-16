@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { resolvePrimaryMonth, chartMonths, formatMonthLabel, uniqueMonths } from '../../utils/monthUtils';
 import { ChangePasswordModal } from '../AuthPages';
 import { QRCodeSVG } from 'qrcode.react';
@@ -128,20 +128,16 @@ export function AgentApp({ user, state, onLogout }: Props) {
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'used'>('all');
   const [ticketPage, setTicketPage] = useState(1);
   const [histPage, setHistPage] = useState(1);
-  const [selectedTicket, setSelectedTicket] = useState<TicketType | null>(null);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileTicketDetail, setMobileTicketDetail] = useState(false);
 
-  // Garder le ticket affiché synchronisé après validation par un prestataire
-  useEffect(() => {
-    setSelectedTicket(prev => {
-      if (!prev) return prev;
-      return state.tickets.find(t => t.id === prev.id) ?? prev;
-    });
-  }, [state.tickets]);
-
   const myTickets = state.tickets.filter(t => t.agentId === user.profileId);
+  const selectedTicket = useMemo(
+    () => (selectedTicketId ? myTickets.find(t => t.id === selectedTicketId) ?? null : null),
+    [selectedTicketId, myTickets],
+  );
   const monthTickets = myTickets.filter(t => t.month === primaryMonth);
   const activeTickets = monthTickets.filter(t => t.status === 'active');
   const usedTickets = monthTickets.filter(t => t.status === 'used');
@@ -162,7 +158,7 @@ export function AgentApp({ user, state, onLogout }: Props) {
   );
 
   const handleTicketClick = (ticket: TicketType) => {
-    setSelectedTicket(ticket);
+    setSelectedTicketId(ticket.id);
     setMobileTicketDetail(true);
   };
 
@@ -196,7 +192,7 @@ export function AgentApp({ user, state, onLogout }: Props) {
       </div>
       <nav className="flex-1 p-3 space-y-0.5">
         {NAV.map(n => (
-          <button key={n.id} onClick={() => { setPage(n.id); setSelectedTicket(null); }}
+          <button key={n.id} onClick={() => { setPage(n.id); setSelectedTicketId(null); }}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left"
             style={{
               background: page === n.id ? '#EBF5FF' : 'transparent',
@@ -219,7 +215,7 @@ export function AgentApp({ user, state, onLogout }: Props) {
   );
 
   // ── Dashboard page ────────────────────────────────────────────────────────
-  const DashboardPage = () => (
+  const dashboardView = (
     <div className="p-6 lg:p-8 space-y-8 overflow-y-auto h-full">
       <div>
         <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1D1D1F', letterSpacing: '-0.5px' }}>
@@ -231,12 +227,12 @@ export function AgentApp({ user, state, onLogout }: Props) {
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Disponibles', value: activeTickets.length, sub: 'tickets ce mois', color: '#0071E3', bg: 'linear-gradient(135deg, #EBF5FF, #F0F9FF)' },
-          { label: 'Utilisés', value: usedTickets.length, sub: 'ce mois', color: '#34C759', bg: 'linear-gradient(135deg, #EDFBF1, #F0FDF4)' },
-          { label: 'Subvention', value: `${usedTickets.reduce((s, t) => s + t.subsidy, 0).toFixed(0)} €`, sub: 'versée ce mois', color: '#FF9500', bg: 'linear-gradient(135deg, #FFF6EB, #FFFBF0)' },
-          { label: 'Subvention', value: `${(monthTickets[0]?.subsidy ?? 0).toFixed(2)} €`, sub: 'par ticket', color: '#AF52DE', bg: 'linear-gradient(135deg, #F8F0FF, #FCF5FF)' },
+          { id: 'available', label: 'Disponibles', value: activeTickets.length, sub: 'tickets ce mois', color: '#0071E3', bg: 'linear-gradient(135deg, #EBF5FF, #F0F9FF)' },
+          { id: 'used', label: 'Utilisés', value: usedTickets.length, sub: 'ce mois', color: '#34C759', bg: 'linear-gradient(135deg, #EDFBF1, #F0FDF4)' },
+          { id: 'subsidy-month', label: 'Subvention', value: `${usedTickets.reduce((s, t) => s + t.subsidy, 0).toFixed(0)} €`, sub: 'versée ce mois', color: '#FF9500', bg: 'linear-gradient(135deg, #FFF6EB, #FFFBF0)' },
+          { id: 'subsidy-ticket', label: 'Subvention', value: `${(monthTickets[0]?.subsidy ?? 0).toFixed(2)} €`, sub: 'par ticket', color: '#AF52DE', bg: 'linear-gradient(135deg, #F8F0FF, #FCF5FF)' },
         ].map(kpi => (
-          <div key={kpi.label} className="rounded-2xl p-5" style={{ background: kpi.bg, border: `1px solid ${kpi.color}18` }}>
+          <div key={kpi.id} className="rounded-2xl p-5" style={{ background: kpi.bg, border: `1px solid ${kpi.color}18` }}>
             <div style={{ fontSize: 30, fontWeight: 800, color: kpi.color, letterSpacing: '-0.5px' }}>{kpi.value}</div>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#1D1D1F', marginTop: 4 }}>{kpi.label}</div>
             <div style={{ fontSize: 11, color: '#6E6E73', marginTop: 2 }}>{kpi.sub}</div>
@@ -303,7 +299,7 @@ export function AgentApp({ user, state, onLogout }: Props) {
   );
 
   // ── Tickets page ──────────────────────────────────────────────────────────
-  const TicketsPage = () => (
+  const ticketsView = (
     <div className="flex h-full overflow-hidden">
       {/* Left: grid */}
       <div className={`flex flex-col overflow-hidden transition-all duration-300 ${selectedTicket ? 'hidden lg:flex lg:w-1/2 xl:w-3/5' : 'flex-1'}`}>
@@ -366,7 +362,7 @@ export function AgentApp({ user, state, onLogout }: Props) {
             ticket={selectedTicket}
             orgName={state.orgName}
             orgLogo={state.orgLogo}
-            onClose={() => setSelectedTicket(null)}
+            onClose={() => setSelectedTicketId(null)}
           />
         </div>
       )}
@@ -386,7 +382,7 @@ export function AgentApp({ user, state, onLogout }: Props) {
   );
 
   // ── History page ──────────────────────────────────────────────────────────
-  const HistoryPage = () => (
+  const historyView = (
     <div className="p-6 lg:p-8 space-y-6 overflow-y-auto h-full">
       <div>
         <h1 style={{ fontSize: 24, fontWeight: 800 }}>Historique</h1>
@@ -420,7 +416,7 @@ export function AgentApp({ user, state, onLogout }: Props) {
         ) : pagedHist.map(t => (
           <div key={t.id} className="flex items-center gap-4 p-4 rounded-2xl bg-white hover:shadow-sm transition-all cursor-pointer"
             style={{ border: '1px solid rgba(0,0,0,0.06)' }}
-            onClick={() => { setSelectedTicket(t); setPage('tickets'); setMobileTicketDetail(true); }}>
+            onClick={() => { setSelectedTicketId(t.id); setPage('tickets'); setMobileTicketDetail(true); }}>
             <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style={{ background: '#EDFBF1' }}>
               <CheckCircle className="w-5 h-5" style={{ color: '#34C759' }} />
             </div>
@@ -447,8 +443,6 @@ export function AgentApp({ user, state, onLogout }: Props) {
       <Pagination page={histPage} total={histTickets.length} perPage={10} onChange={setHistPage} />
     </div>
   );
-
-  const pageContent = { dashboard: <DashboardPage />, tickets: <TicketsPage />, history: <HistoryPage /> }[page];
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -478,8 +472,10 @@ export function AgentApp({ user, state, onLogout }: Props) {
         </header>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden" style={{ background: page === 'tickets' ? '#F5F5F7' : '#F5F5F7' }}>
-          {pageContent}
+        <div className="flex-1 overflow-hidden" style={{ background: '#F5F5F7' }}>
+          {page === 'dashboard' && dashboardView}
+          {page === 'tickets' && ticketsView}
+          {page === 'history' && historyView}
         </div>
       </div>
 
