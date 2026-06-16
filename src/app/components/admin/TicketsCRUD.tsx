@@ -2,10 +2,10 @@ import { useState, useMemo, useEffect } from 'react';
 import { Plus, Download, Trash2, Search, ChevronLeft, Eye, CheckSquare, Square, Users, FolderArchive } from 'lucide-react';
 import { OrgLogo } from '../shared/OrgLogo';
 import { Ticket, Agent, SubventionConfig, AgentMonthlyPlan } from '../../types';
-import { TicketGenerationItem } from '../../api';
+import { TicketGenerationItem, exportTicketsZipByService } from '../../api';
 import { Pagination } from '../shared/Pagination';
 import { AdminRoute } from './AdminApp';
-import { downloadTicketPDF, downloadBatchTicketsPDF, downloadTicketsZipByService, ServiceTicketGroup } from '../shared/pdfUtils';
+import { downloadTicketPDF, downloadBatchTicketsPDF, ServiceTicketGroup } from '../shared/pdfUtils';
 import { TicketVisual } from '../shared/TicketVisual';
 import { AdminFormLayout } from '../shared/AdminFormLayout';
 import { FilterSelect, MonthInput } from '../shared/FilterSelect';
@@ -95,7 +95,7 @@ function buildAgentServiceMap(
   const map = new Map<string, string>();
   for (const agent of agents) {
     const plan = monthlyPlans.find(p => p.agentId === agent.id && (!month || p.month === month));
-    map.set(agent.id, plan?.serviceName ?? agent.department);
+    map.set(agent.id, (plan?.serviceName && plan.serviceName.trim()) ? plan.serviceName : agent.department);
   }
   return map;
 }
@@ -172,6 +172,7 @@ function ExportByServicePage({
   const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState('');
+  const [error, setError] = useState('');
 
   const agentServiceMap = useMemo(
     () => buildAgentServiceMap(agents, monthlyPlans, month),
@@ -188,7 +189,7 @@ function ExportByServicePage({
 
   useEffect(() => {
     setSelectedServices(new Set(serviceRows.filter(r => r.count > 0).map(r => r.serviceName)));
-  }, [serviceRows]);
+  }, [month, statusFilter]);
 
   const selectedCount = useMemo(() => {
     return groupTicketsByService(tickets, agentServiceMap, month, statusFilter, selectedServices)
@@ -215,23 +216,21 @@ function ExportByServicePage({
   };
 
   const handleDownload = async () => {
-    const groups = groupTicketsByService(tickets, agentServiceMap, month, statusFilter, selectedServices);
-    if (groups.length === 0) return;
+    if (selectedServices.size === 0 || selectedCount === 0) return;
 
     setDownloading(true);
-    setProgress('Préparation…');
+    setError('');
+    setProgress(`Génération de ${selectedCount} ticket(s) pour ${selectedServices.size} service(s)…`);
     try {
-      await downloadTicketsZipByService(
-        groups,
-        orgName,
-        orgLogo,
-        `tickets-${month}-par-service.zip`,
-        (done, total, serviceName) => {
-          if (serviceName) {
-            setProgress(`Service ${done + 1}/${total} : ${serviceName}`);
-          }
-        },
-      );
+      await exportTicketsZipByService({
+        month,
+        status: statusFilter,
+        services: [...selectedServices],
+      });
+      setProgress('');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erreur lors de l\'export';
+      setError(message);
       setProgress('');
     } finally {
       setDownloading(false);
@@ -341,6 +340,11 @@ function ExportByServicePage({
           <Download className="w-5 h-5" />
           {downloading ? (progress || 'Génération du ZIP…') : `Télécharger le ZIP (${selectedCount} tickets)`}
         </button>
+        {error && (
+          <p className="text-center" style={{ fontSize: 13, color: '#DC2626', fontWeight: 600 }}>
+            {error}
+          </p>
+        )}
       </div>
     </div>
   );

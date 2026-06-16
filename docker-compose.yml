@@ -48,8 +48,11 @@ services:
     volumes:
       - ./backend/src:/app/src
       - ./backend/migrations:/app/migrations
+      - ./backend/package.json:/app/package.json
+      - ./backend/package-lock.json:/app/package-lock.json
       - ./datadoc:/datadoc:ro
       - /app/node_modules
+    command: sh -c "npm install && npm run migrate && npm run seed && npm run dev"
     depends_on:
       postgres:
         condition: service_healthy
