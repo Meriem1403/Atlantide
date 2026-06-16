@@ -1,4 +1,4 @@
-# Application de tickets repas
+# Atlantide
 
 Gestion des tickets repas pour agents, prestataires et administrateurs.
 
@@ -57,7 +57,7 @@ Le frontend React est déployable sur [Netlify](https://www.netlify.com/). L'API
 ### 1. Connecter le dépôt
 
 1. Netlify → **Add new site** → **Import from Git**
-2. Dépôt : `Meriem1403/Appticketsrepas`
+2. Dépôt : [`Meriem1403/Atlantide`](https://github.com/Meriem1403/Atlantide)
 3. Netlify lit automatiquement `netlify.toml` (build + publish `dist`)
 
 ### 2. Variables d'environnement (Netlify)
