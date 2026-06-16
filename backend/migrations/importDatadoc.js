@@ -4,7 +4,7 @@ import { loadDatadocFiles, agentCode, getDatadocDir } from '../src/utils/odsPars
 import { newId } from '../src/utils/tickets.js';
 import { provisionAgentUser, provisionProviderUser } from '../src/services/userProvisioning.js';
 
-const ORG_NAME = process.env.ORG_NAME || 'Ministère chargé de la Mer et de la Pêche';
+const ORG_NAME = process.env.ORG_NAME || 'DIRM Méditerranée';
 
 function slugify(str) {
   return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()

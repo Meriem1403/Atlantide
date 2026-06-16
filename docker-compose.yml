@@ -44,7 +44,7 @@ services:
       MAIL_FROM: "Tickets Repas <noreply@ticketsrepas.local>"
       ADMIN_NOTIFICATION_EMAIL: compta@mairie.fr
       DATADOC_PATH: /datadoc
-      ORG_NAME: Ministère chargé de la Mer et de la Pêche
+      ORG_NAME: "DIRM Méditerranée"
     volumes:
       - ./backend/src:/app/src
       - ./backend/migrations:/app/migrations

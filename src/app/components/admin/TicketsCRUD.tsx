@@ -331,7 +331,6 @@ function ViewPage({ ticket, orgName, orgLogo, navigate }: { ticket: Ticket; orgN
                 ['Agent', ticket.agentName, false],
                 ['Mois', new Date(ticket.month + '-15').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }), false],
                 ['Valeur faciale', `${ticket.faceValue.toFixed(2)} €`, false],
-                ['Subvention employeur', `${ticket.subsidy.toFixed(2)} €`, false],
                 ['Généré le', new Date(ticket.generatedAt).toLocaleString('fr-FR'), false],
                 ...(ticket.usedAt ? [['Utilisé le', new Date(ticket.usedAt).toLocaleString('fr-FR'), false]] : []),
                 ...(ticket.providerName ? [['Prestataire', ticket.providerName, false]] : []),

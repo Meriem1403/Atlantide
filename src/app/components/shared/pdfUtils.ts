@@ -43,16 +43,21 @@ async function buildTicketPage(
     } catch { /* skip bad logo */ }
   }
 
+  const qrLeft = W - 28;
+  const textMaxW = qrLeft - 5;
+
   pdf.setTextColor(255, 255, 255);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(8);
-  pdf.text(orgName, textX, 7);
+  const orgLines = pdf.splitTextToSize(orgName, textMaxW - (textX - 5));
+  pdf.text(orgLines, textX, 7);
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(5.5);
-  pdf.text('Ticket restaurant', textX, 11);
+  const ticketTypeY = 7 + orgLines.length * 3.2;
+  pdf.text('Ticket repas', textX, ticketTypeY);
 
   const qrDataUrl: string = await QRCode.toDataURL(ticket.qrData, { width: 200, margin: 1 });
-  pdf.addImage(qrDataUrl, 'PNG', W - 28, 18, 24, 24);
+  pdf.addImage(qrDataUrl, 'PNG', qrLeft, 18, 24, 24);
 
   pdf.setFillColor(245, 245, 247);
   pdf.roundedRect(5, 18, 50, 7, 2, 2, 'F');
@@ -64,7 +69,8 @@ async function buildTicketPage(
   pdf.setTextColor(29, 29, 31);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(9.5);
-  pdf.text(ticket.agentName, 5, 33);
+  const nameLines = pdf.splitTextToSize(ticket.agentName, textMaxW);
+  pdf.text(nameLines, 5, 33);
 
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(6.5);
@@ -73,17 +79,13 @@ async function buildTicketPage(
     month: 'long',
     year: 'numeric',
   });
-  pdf.text(`Valable : ${monthLabel}`, 5, 38);
+  const monthY = 33 + nameLines.length * 4 + 1;
+  pdf.text(`Valable : ${monthLabel}`, 5, monthY);
 
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(18);
   pdf.setTextColor(67, 97, 238);
-  pdf.text(`${ticket.faceValue.toFixed(2)} EUR`, 5, 48);
-
-  pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(5.5);
-  pdf.setTextColor(110, 110, 115);
-  pdf.text(`Subvention employeur : ${ticket.subsidy.toFixed(2)} EUR`, 5, 53);
+  pdf.text(`${ticket.faceValue.toFixed(2)} EUR`, 5, monthY + 10);
 
   pdf.setDrawColor(200, 200, 200);
   pdf.setLineDashPattern([1, 1], 0);
