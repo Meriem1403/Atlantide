@@ -8,7 +8,7 @@ interface Props {
   orgLogo: string;
   notificationEmail: string;
   mailFrom: string;
-  onSave: (orgName: string, orgLogo: string, notificationEmail?: string, mailFrom?: string) => void;
+  onSave: (orgName: string, orgLogo: string, notificationEmail?: string, mailFrom?: string) => Promise<void>;
 }
 
 export function SettingsPage({ orgName, orgLogo, notificationEmail, mailFrom, onSave }: Props) {
@@ -17,6 +17,8 @@ export function SettingsPage({ orgName, orgLogo, notificationEmail, mailFrom, on
   const [notifEmail, setNotifEmail] = useState(notificationEmail);
   const [fromEmail, setFromEmail] = useState(mailFrom);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   // Sync when props change (e.g. external update)
   useEffect(() => { setName(orgName); }, [orgName]);
@@ -32,15 +34,29 @@ export function SettingsPage({ orgName, orgLogo, notificationEmail, mailFrom, on
     reader.readAsDataURL(file);
   };
 
-  const handleSave = () => {
-    onSave(name, logo, notifEmail, fromEmail);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+  const handleSave = async () => {
+    setSaveError('');
+    setSaving(true);
+    try {
+      await onSave(name, logo, notifEmail, fromEmail);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Impossible d\'enregistrer les paramètres.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <AdminFormLayout title="Paramètres" subtitle="Configuration générale de l'application" maxWidth="4xl">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+          {saveError && (
+            <div className="lg:col-span-2 flex items-center gap-3 p-4 rounded-2xl" style={{ background: '#FEE2E2', border: '1px solid #FCA5A5' }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: '#B91C1C' }}>{saveError}</span>
+            </div>
+          )}
 
           {saved && (
             <div className="flex items-center gap-3 p-4 rounded-2xl" style={{ background: '#DCFCE7', border: '1px solid #86EFAC' }}>
@@ -176,10 +192,10 @@ export function SettingsPage({ orgName, orgLogo, notificationEmail, mailFrom, on
           </div>
 
           {/* Save button */}
-          <button onClick={handleSave}
-            className="lg:col-span-2 flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl transition-all hover:opacity-90"
+          <button onClick={handleSave} disabled={saving}
+            className="lg:col-span-2 flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl transition-all hover:opacity-90 disabled:opacity-60"
             style={{ background: '#4361EE', color: 'white', fontSize: 15, fontWeight: 700 }}>
-            <Save className="w-5 h-5" /> Enregistrer les paramètres
+            <Save className="w-5 h-5" /> {saving ? 'Enregistrement…' : 'Enregistrer les paramètres'}
           </button>
         </div>
     </AdminFormLayout>

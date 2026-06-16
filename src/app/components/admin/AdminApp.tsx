@@ -49,7 +49,7 @@ interface Props {
   onDeleteTicket: (id: string) => void;
   onApproveInvoice: (id: string, note: string) => void;
   onRejectInvoice: (id: string, note: string) => void;
-  onUpdateSettings: (orgName: string, orgLogo: string, notificationEmail?: string, mailFrom?: string) => void;
+  onUpdateSettings: (orgName: string, orgLogo: string, notificationEmail?: string, mailFrom?: string) => Promise<void>;
 }
 
 const CHART_COLORS = ['#4361EE', '#2DC653', '#F59E0B', '#8B5CF6', '#E63946'];
