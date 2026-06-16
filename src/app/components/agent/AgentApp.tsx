@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { resolvePrimaryMonth, chartMonths, formatMonthLabel, uniqueMonths } from '../../utils/monthUtils';
 import { ChangePasswordModal } from '../AuthPages';
 import { QRCodeSVG } from 'qrcode.react';
@@ -132,6 +132,14 @@ export function AgentApp({ user, state, onLogout }: Props) {
   const [downloading, setDownloading] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileTicketDetail, setMobileTicketDetail] = useState(false);
+
+  // Garder le ticket affiché synchronisé après validation par un prestataire
+  useEffect(() => {
+    setSelectedTicket(prev => {
+      if (!prev) return prev;
+      return state.tickets.find(t => t.id === prev.id) ?? prev;
+    });
+  }, [state.tickets]);
 
   const myTickets = state.tickets.filter(t => t.agentId === user.profileId);
   const monthTickets = myTickets.filter(t => t.month === primaryMonth);

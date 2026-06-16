@@ -148,7 +148,7 @@ export function SettingsPage({ orgName, orgLogo, notificationEmail, mailFrom, on
                   <OrgLogo src={logo} size={44} onDark />
                   <div>
                     <div style={{ fontSize: 12, color: 'white', fontWeight: 700 }}>{name || 'Organisation'}</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>Ticket restaurant</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>Ticket repas</div>
                   </div>
                 </div>
               </div>

@@ -34,11 +34,11 @@ export function TicketVisual({ ticket, orgName, orgLogo = '', compact = false }:
       >
         <div className="flex items-center gap-3 mb-6">
           <OrgLogo src={orgLogo} size={compact ? 40 : 48} shape="banner" onDark />
-          <div className="min-w-0 flex-1">
-            <div style={{ fontSize: compact ? 11 : 12, color: 'rgba(255,255,255,0.95)', fontWeight: 700 }}>
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <div className="truncate" style={{ fontSize: compact ? 11 : 12, color: 'rgba(255,255,255,0.95)', fontWeight: 700 }}>
               {orgName}
             </div>
-            <div style={{ fontSize: compact ? 9 : 10, color: 'rgba(255,255,255,0.7)' }}>Ticket restaurant</div>
+            <div style={{ fontSize: compact ? 9 : 10, color: 'rgba(255,255,255,0.7)' }}>Ticket repas</div>
           </div>
           {isUsed && (
             <div className="shrink-0 px-2.5 py-1 rounded-full flex items-center gap-1.5" style={{ background: 'rgba(255,255,255,0.2)' }}>
@@ -82,13 +82,9 @@ export function TicketVisual({ ticket, orgName, orgLogo = '', compact = false }:
               <div style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 4 }}>N° UNIQUE</div>
               <div style={{ fontSize: 12, fontWeight: 700, fontFamily: 'monospace', color: '#111827', wordBreak: 'break-all' }}>{ticket.number}</div>
             </div>
-            <div>
+            <div className="min-w-0">
               <div style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 4 }}>BÉNÉFICIAIRE</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>{ticket.agentName}</div>
-            </div>
-            <div className="sm:col-span-2">
-              <div style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 4 }}>SUBVENTION EMPLOYEUR</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#16A34A' }}>{ticket.subsidy.toFixed(2)} €</div>
+              <div className="break-words line-clamp-2" style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>{ticket.agentName}</div>
             </div>
             {isUsed && ticket.usedAt && (
               <div className="sm:col-span-2 p-3 rounded-xl" style={{ background: '#F0FDF4' }}>

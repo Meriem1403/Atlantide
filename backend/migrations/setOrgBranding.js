@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import pool from '../src/config/database.js';
 
-const ORG_NAME = process.env.ORG_NAME || 'Ministère chargé de la Mer et de la Pêche';
+const ORG_NAME = process.env.ORG_NAME || 'DIRM Méditerranée';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const candidates = [

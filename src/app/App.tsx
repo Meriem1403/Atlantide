@@ -136,7 +136,8 @@ export default function App() {
     if (!currentUser || currentUser.role === 'provider') return;
 
     const tick = () => { refreshState().catch(() => {}); };
-    const interval = window.setInterval(tick, 8000);
+    const intervalMs = currentUser.role === 'agent' ? 2000 : 8000;
+    const interval = window.setInterval(tick, intervalMs);
 
     const onVisible = () => {
       if (document.visibilityState === 'visible') tick();

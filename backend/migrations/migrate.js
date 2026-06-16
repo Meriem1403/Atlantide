@@ -3,7 +3,7 @@ import pool from '../src/config/database.js';
 const schema = `
 CREATE TABLE IF NOT EXISTS settings (
   id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-  org_name VARCHAR(255) NOT NULL DEFAULT 'Mairie de Paris',
+  org_name VARCHAR(255) NOT NULL DEFAULT 'DIRM Méditerranée',
   org_logo TEXT NOT NULL DEFAULT '',
   notification_email VARCHAR(255) NOT NULL DEFAULT ''
 );
@@ -135,7 +135,7 @@ async function migrate() {
   try {
     await client.query(schema);
     await client.query(
-      `INSERT INTO settings (id, org_name, org_logo) VALUES (1, 'Mairie de Paris', '')
+      `INSERT INTO settings (id, org_name, org_logo) VALUES (1, 'DIRM Méditerranée', '')
        ON CONFLICT (id) DO NOTHING`
     );
     console.log('Migration terminée.');
