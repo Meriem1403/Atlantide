@@ -150,11 +150,14 @@ export async function validateTicket(ticketNumber: string): Promise<{ success: b
   });
 }
 
-export async function exportTicketsZipByService(params: {
-  month: string;
-  status: 'active' | 'all' | 'used';
-  services: string[];
-}): Promise<void> {
+export async function exportTicketsZipByService(
+  params: {
+    month: string;
+    status: 'active' | 'all' | 'used';
+    services: string[];
+  },
+  onProgress?: (label: string) => void,
+): Promise<void> {
   const token = getToken();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 300_000);
@@ -188,10 +191,30 @@ export async function exportTicketsZipByService(params: {
     throw new Error((data as { error?: string }).error || `Erreur HTTP ${res.status}`);
   }
 
-  const blob = await res.blob();
   const disposition = res.headers.get('Content-Disposition');
   const match = disposition?.match(/filename="?([^"]+)"?/);
   const fileName = match?.[1] ?? `tickets-${params.month}-par-service.zip`;
+
+  onProgress?.('Génération sur le serveur…');
+
+  if (!res.body) {
+    throw new Error('Réponse vide du serveur');
+  }
+
+  const reader = res.body.getReader();
+  const chunks: BlobPart[] = [];
+  let received = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.byteLength;
+    const mb = (received / (1024 * 1024)).toFixed(1);
+    onProgress?.(received > 0 ? `Réception du ZIP… ${mb} Mo` : 'Génération sur le serveur…');
+  }
+
+  const blob = new Blob(chunks, { type: 'application/zip' });
 
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');

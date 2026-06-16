@@ -1,9 +1,9 @@
 import { ZipArchive } from 'archiver';
 import pool from '../config/database.js';
 import { mapTicket } from '../utils/mappers.js';
-import { buildTicketsPdfBuffer } from './ticketPdf.js';
+import { buildTicketsPdfBuffer, prepareExportAssets } from './ticketPdf.js';
 
-const PDF_CONCURRENCY = 6;
+const PDF_CONCURRENCY = 10;
 
 export function sanitizePathSegment(name) {
   return (name || 'Sans service')
@@ -122,20 +122,31 @@ export async function streamTicketsZip(res, { month, statusFilter, services, org
     throw err;
   }
 
+  const allTickets = batches.flatMap((batch) => batch.tickets);
+  const ticketCount = allTickets.length;
   const fileName = `tickets-${month}-par-service.zip`;
+
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.setHeader('X-Export-Ticket-Count', String(ticketCount));
+  res.setHeader('X-Export-Agent-Count', String(batches.length));
+  if (typeof res.flushHeaders === 'function') {
+    res.flushHeaders();
+  }
 
-  const archive = new ZipArchive({ zlib: { level: 3 } });
+  const assets = await prepareExportAssets(allTickets, orgLogo);
+
+  const archive = new ZipArchive({ zlib: { level: 1 } });
   archive.on('error', (err) => {
     throw err;
   });
   archive.pipe(res);
 
   const paths = buildArchivePaths(batches);
+  const concurrency = Math.min(PDF_CONCURRENCY, batches.length);
 
-  await mapWithConcurrency(batches, PDF_CONCURRENCY, async (batch, index) => {
-    const buffer = await buildTicketsPdfBuffer(batch.tickets, orgName, orgLogo);
+  await mapWithConcurrency(batches, concurrency, async (batch, index) => {
+    const buffer = buildTicketsPdfBuffer(batch.tickets, orgName, orgLogo, assets);
     archive.append(buffer, { name: paths[index] });
     return null;
   });
