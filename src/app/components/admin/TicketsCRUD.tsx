@@ -94,10 +94,36 @@ function buildAgentServiceMap(
 ): Map<string, string> {
   const map = new Map<string, string>();
   for (const agent of agents) {
-    const plan = monthlyPlans.find(p => p.agentId === agent.id && p.month === month);
-    map.set(agent.id, plan?.serviceName ?? agent.department ?? 'Sans service');
+    const plan = monthlyPlans.find(p => p.agentId === agent.id && (!month || p.month === month));
+    map.set(agent.id, plan?.serviceName ?? agent.department);
   }
   return map;
+}
+
+function getServicesForMonth(
+  agents: Agent[],
+  monthlyPlans: AgentMonthlyPlan[],
+  month: string,
+): string[] {
+  const map = buildAgentServiceMap(agents, monthlyPlans, month);
+  return [...new Set([...map.values()].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+}
+
+function countTicketsByService(
+  tickets: Ticket[],
+  agentServiceMap: Map<string, string>,
+  month: string,
+  statusFilter: string,
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const ticket of tickets) {
+    if (ticket.month !== month) continue;
+    if (statusFilter !== 'all' && ticket.status !== statusFilter) continue;
+    const serviceName = agentServiceMap.get(ticket.agentId);
+    if (!serviceName) continue;
+    counts.set(serviceName, (counts.get(serviceName) ?? 0) + 1);
+  }
+  return counts;
 }
 
 function groupTicketsByService(
@@ -112,8 +138,8 @@ function groupTicketsByService(
   for (const ticket of tickets) {
     if (ticket.month !== month) continue;
     if (statusFilter !== 'all' && ticket.status !== statusFilter) continue;
-    const serviceName = agentServiceMap.get(ticket.agentId) ?? 'Sans service';
-    if (!selectedServices.has(serviceName)) continue;
+    const serviceName = agentServiceMap.get(ticket.agentId);
+    if (!serviceName || !selectedServices.has(serviceName)) continue;
     if (!byService.has(serviceName)) byService.set(serviceName, []);
     byService.get(serviceName)!.push(ticket);
   }
@@ -141,7 +167,7 @@ function ExportByServicePage({
     () => [...new Set([...monthlyPlans.map(p => p.month), ...tickets.map(t => t.month)])].sort().reverse(),
     [monthlyPlans, tickets],
   );
-  const [month, setMonth] = useState(months[0] ?? '2026-07');
+  const [month, setMonth] = useState(monthlyPlans[0]?.month ?? months[0] ?? '');
   const [statusFilter, setStatusFilter] = useState<'active' | 'all' | 'used'>('active');
   const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState(false);
@@ -153,20 +179,15 @@ function ExportByServicePage({
   );
 
   const serviceRows = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const ticket of tickets) {
-      if (ticket.month !== month) continue;
-      if (statusFilter !== 'all' && ticket.status !== statusFilter) continue;
-      const serviceName = agentServiceMap.get(ticket.agentId) ?? 'Sans service';
-      counts.set(serviceName, (counts.get(serviceName) ?? 0) + 1);
-    }
-    return [...counts.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0], 'fr'))
-      .map(([serviceName, count]) => ({ serviceName, count }));
-  }, [tickets, agentServiceMap, month, statusFilter]);
+    const ticketCounts = countTicketsByService(tickets, agentServiceMap, month, statusFilter);
+    return getServicesForMonth(agents, monthlyPlans, month).map(serviceName => ({
+      serviceName,
+      count: ticketCounts.get(serviceName) ?? 0,
+    }));
+  }, [agents, monthlyPlans, tickets, agentServiceMap, month, statusFilter]);
 
   useEffect(() => {
-    setSelectedServices(new Set(serviceRows.map(r => r.serviceName)));
+    setSelectedServices(new Set(serviceRows.filter(r => r.count > 0).map(r => r.serviceName)));
   }, [serviceRows]);
 
   const selectedCount = useMemo(() => {
@@ -184,10 +205,12 @@ function ExportByServicePage({
   };
 
   const toggleAll = () => {
-    if (selectedServices.size === serviceRows.length) {
+    const selectable = serviceRows.filter(r => r.count > 0);
+    const allSelected = selectable.length > 0 && selectable.every(r => selectedServices.has(r.serviceName));
+    if (allSelected) {
       setSelectedServices(new Set());
     } else {
-      setSelectedServices(new Set(serviceRows.map(r => r.serviceName)));
+      setSelectedServices(new Set(selectable.map(r => r.serviceName)));
     }
   };
 
@@ -250,25 +273,29 @@ function ExportByServicePage({
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <h3 style={{ fontSize: 16, fontWeight: 700 }}>Services</h3>
             <button onClick={toggleAll} className="flex items-center gap-2" style={{ fontSize: 13, fontWeight: 600, color: '#4361EE' }}>
-              {selectedServices.size === serviceRows.length ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-              {selectedServices.size === serviceRows.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+              {serviceRows.filter(r => r.count > 0).every(r => selectedServices.has(r.serviceName)) && selectedServices.size > 0
+                ? <><CheckSquare className="w-4 h-4" /> Tout désélectionner</>
+                : <><Square className="w-4 h-4" /> Tout sélectionner</>}
             </button>
           </div>
 
           {serviceRows.length === 0 ? (
             <div className="py-14 text-center" style={{ fontSize: 14, color: '#6B7280' }}>
-              Aucun ticket pour ce mois et ce filtre.
+              Aucun service en base pour ce mois. Importez les données ou vérifiez les plans mensuels.
             </div>
           ) : (
             <div className="divide-y divide-border">
               {serviceRows.map(row => {
                 const checked = selectedServices.has(row.serviceName);
+                const empty = row.count === 0;
                 return (
                   <button
                     key={row.serviceName}
                     type="button"
-                    onClick={() => toggleService(row.serviceName)}
-                    className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-[#F9FAFB] transition-colors"
+                    onClick={() => !empty && toggleService(row.serviceName)}
+                    disabled={empty}
+                    className="w-full flex items-center gap-4 px-5 py-4 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ background: empty ? '#FAFAFA' : checked ? '#F8FAFF' : 'transparent' }}
                   >
                     {checked
                       ? <CheckSquare className="w-5 h-5 shrink-0" style={{ color: '#4361EE' }} />
@@ -282,7 +309,12 @@ function ExportByServicePage({
                         Dossier : {row.serviceName}/
                       </div>
                     </div>
-                    <span className="shrink-0 px-3 py-1 rounded-full" style={{ fontSize: 12, fontWeight: 700, background: '#EEF2FF', color: '#4361EE' }}>
+                    <span className="shrink-0 px-3 py-1 rounded-full" style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      background: empty ? '#F3F4F6' : '#EEF2FF',
+                      color: empty ? '#9CA3AF' : '#4361EE',
+                    }}>
                       {row.count} ticket{row.count > 1 ? 's' : ''}
                     </span>
                   </button>
@@ -596,18 +628,14 @@ export function TicketsCRUD({ route, navigate, tickets, agents, subventions, mon
   const [downloading, setDownloading] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ ticket: Ticket; action: 'cancel' | 'delete' } | null>(null);
 
-  const agentServiceMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const a of agents) {
-      const plan = monthlyPlans.find(p => p.agentId === a.id && (!filterMonth || p.month === filterMonth));
-      map.set(a.id, plan?.serviceName ?? a.department);
-    }
-    return map;
-  }, [agents, monthlyPlans, filterMonth]);
+  const agentServiceMap = useMemo(
+    () => buildAgentServiceMap(agents, monthlyPlans, filterMonth),
+    [agents, monthlyPlans, filterMonth],
+  );
 
   const services = useMemo(
-    () => [...new Set([...agentServiceMap.values()].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr')),
-    [agentServiceMap],
+    () => getServicesForMonth(agents, monthlyPlans, filterMonth),
+    [agents, monthlyPlans, filterMonth],
   );
 
   const filteredAgents = useMemo(() => {
