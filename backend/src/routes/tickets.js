@@ -4,8 +4,41 @@ import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { mapTicket } from '../utils/mappers.js';
 import { generateForAgent } from '../services/ticketGeneration.js';
 import { notifyTicketsGenerated, notifyTicketValidated } from '../services/notifications.js';
+import { streamTicketsZip } from '../services/ticketZipExport.js';
 
 const router = Router();
+
+router.post('/export-zip', authenticateToken, requireRole('admin'), async (req, res) => {
+  try {
+    const { month, status = 'active', services, orgName, orgLogo } = req.body;
+    if (!month || !Array.isArray(services) || services.length === 0) {
+      return res.status(400).json({ error: 'Mois et services requis' });
+    }
+
+    let branding = { orgName: orgName ?? '', orgLogo: orgLogo ?? '' };
+    if (!branding.orgName) {
+      const settings = await pool.query('SELECT org_name, org_logo FROM settings WHERE id = 1');
+      branding = {
+        orgName: settings.rows[0]?.org_name ?? 'DIRM Méditerranée',
+        orgLogo: settings.rows[0]?.org_logo ?? '',
+      };
+    }
+
+    await streamTicketsZip(res, {
+      month,
+      statusFilter: status,
+      services,
+      orgName: branding.orgName,
+      orgLogo: branding.orgLogo,
+    });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error(err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Erreur lors de l\'export ZIP' });
+    }
+  }
+});
 
 router.post('/generate', authenticateToken, requireRole('admin'), async (req, res) => {
   const client = await pool.connect();

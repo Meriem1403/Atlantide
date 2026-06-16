@@ -1,7 +1,9 @@
 import {
   AppState, CurrentUser, Agent, Provider, SubventionConfig, ProviderInvoice,
 } from '../types';
-import { apiFetch, setToken, wakeApi } from './client';
+import { apiFetch, getToken, setToken, wakeApi } from './client';
+
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 export { wakeApi };
 
@@ -146,6 +148,60 @@ export async function validateTicket(ticketNumber: string): Promise<{ success: b
     method: 'POST',
     body: JSON.stringify({ ticketNumber }),
   });
+}
+
+export async function exportTicketsZipByService(params: {
+  month: string;
+  status: 'active' | 'all' | 'used';
+  services: string[];
+}): Promise<void> {
+  const token = getToken();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 300_000);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/tickets/export-zip`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        month: params.month,
+        status: params.status,
+        services: params.services,
+      }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error('L\'export prend trop de temps. Réessayez avec moins de services.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as { error?: string }).error || `Erreur HTTP ${res.status}`);
+  }
+
+  const blob = await res.blob();
+  const disposition = res.headers.get('Content-Disposition');
+  const match = disposition?.match(/filename="?([^"]+)"?/);
+  const fileName = match?.[1] ?? `tickets-${params.month}-par-service.zip`;
+
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
 }
 
 export async function submitInvoice(inv: Omit<ProviderInvoice, 'id' | 'submittedAt' | 'status'>) {
