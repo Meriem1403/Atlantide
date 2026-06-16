@@ -306,7 +306,7 @@ function ExportByServicePage({
                         <span style={{ fontSize: 14, fontWeight: 600, color: '#111827' }} className="truncate">{row.serviceName}</span>
                       </div>
                       <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>
-                        Dossier : {row.serviceName}/
+                        {row.serviceName}/Nom Prénom/
                       </div>
                     </div>
                     <span className="shrink-0 px-3 py-1 rounded-full" style={{
@@ -327,9 +327,8 @@ function ExportByServicePage({
         <div className="bg-white rounded-2xl p-5" style={{ border: '1px solid rgba(17,24,39,0.07)' }}>
           <h4 style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Contenu du ZIP</h4>
           <p style={{ fontSize: 13, color: '#6B7280', lineHeight: 1.6 }}>
-            Chaque service aura son propre dossier (nom du service). À l&apos;intérieur :
-            un PDF regroupé <code style={{ fontSize: 12 }}>tickets.pdf</code> et un PDF par ticket
-            nommé <code style={{ fontSize: 12 }}>Agent - TR-….pdf</code>.
+            Un ZIP avec un dossier par service, puis un sous-dossier par agent
+            (nom et prénom). Chaque agent a son fichier <code style={{ fontSize: 12 }}>tickets.pdf</code>.
           </p>
         </div>
 
