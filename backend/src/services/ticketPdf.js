@@ -1,13 +1,16 @@
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
 import sizeOf from 'image-size';
+import sharp from 'sharp';
+
+const monthLabelCache = new Map();
 
 function fitInBox(nw, nh, maxW, maxH) {
   const ratio = Math.min(maxW / nw, maxH / nh, 1);
   return { w: nw * ratio, h: nh * ratio };
 }
 
-function resolveLogoFit(orgLogo) {
+export function resolveLogoFit(orgLogo) {
   if (!orgLogo) return null;
   try {
     const ext = orgLogo.startsWith('data:image/png') ? 'PNG' : 'JPEG';
@@ -21,13 +24,80 @@ function resolveLogoFit(orgLogo) {
   }
 }
 
-async function prefetchQrCodes(tickets) {
-  return Promise.all(
-    tickets.map((ticket) => QRCode.toDataURL(ticket.qrData, { width: 200, margin: 1 })),
+async function prepareLogoForPdf(orgLogo) {
+  if (!orgLogo) return { logo: '', logoFit: null };
+
+  try {
+    const base64 = orgLogo.includes(',') ? orgLogo.split(',')[1] : orgLogo;
+    const input = Buffer.from(base64, 'base64');
+    const resized = await sharp(input)
+      .resize(220, 130, { fit: 'inside', withoutEnlargement: true })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+    const { width = 1, height = 1 } = await sharp(resized).metadata();
+    const fit = fitInBox(width, height, 22, 13);
+    return {
+      logo: `data:image/png;base64,${resized.toString('base64')}`,
+      logoFit: { w: fit.w, h: fit.h, ext: 'PNG' },
+    };
+  } catch {
+    return { logo: '', logoFit: null };
+  }
+}
+
+function getMonthLabel(month) {
+  if (!monthLabelCache.has(month)) {
+    monthLabelCache.set(
+      month,
+      new Date(`${month}-15`).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+    );
+  }
+  return monthLabelCache.get(month);
+}
+
+async function mapWithConcurrency(items, concurrency, fn) {
+  if (items.length === 0) return;
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const i = nextIndex++;
+      await fn(items[i], i);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
   );
 }
 
-function buildTicketPage(pdf, ticket, orgName, orgLogo, logoFit, qrDataUrl, pageIndex) {
+export async function prepareExportAssets(tickets, orgLogo = '') {
+  const [logoAssets, qrByTicketId] = await Promise.all([
+    prepareLogoForPdf(orgLogo),
+    (async () => {
+      const map = new Map();
+      const unique = [...new Map(tickets.map((t) => [t.id, t])).values()];
+      await mapWithConcurrency(unique, 24, async (ticket) => {
+        const buffer = await QRCode.toBuffer(ticket.qrData, {
+          type: 'png',
+          width: 96,
+          margin: 0,
+          errorCorrectionLevel: 'L',
+        });
+        map.set(ticket.id, buffer);
+      });
+      return map;
+    })(),
+  ]);
+
+  return {
+    logo: logoAssets.logo,
+    logoFit: logoAssets.logoFit,
+    qrByTicketId,
+  };
+}
+
+function buildTicketPage(pdf, ticket, orgName, orgLogo, logoFit, qrImage, pageIndex) {
   if (pageIndex > 0) pdf.addPage([85, 60], 'landscape');
 
   const W = 85;
@@ -56,7 +126,7 @@ function buildTicketPage(pdf, ticket, orgName, orgLogo, logoFit, qrDataUrl, page
   const ticketTypeY = 7 + orgLines.length * 3.2;
   pdf.text('Ticket repas', textX, ticketTypeY);
 
-  pdf.addImage(qrDataUrl, 'PNG', qrLeft, 18, 24, 24);
+  pdf.addImage(qrImage, 'PNG', qrLeft, 18, 24, 24);
 
   pdf.setFillColor(245, 245, 247);
   pdf.roundedRect(5, 18, 50, 7, 2, 2, 'F');
@@ -74,12 +144,8 @@ function buildTicketPage(pdf, ticket, orgName, orgLogo, logoFit, qrDataUrl, page
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(6.5);
   pdf.setTextColor(110, 110, 115);
-  const monthLabel = new Date(`${ticket.month}-15`).toLocaleDateString('fr-FR', {
-    month: 'long',
-    year: 'numeric',
-  });
   const monthY = 33 + nameLines.length * 4 + 1;
-  pdf.text(`Valable : ${monthLabel}`, 5, monthY);
+  pdf.text(`Valable : ${getMonthLabel(ticket.month)}`, 5, monthY);
 
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(18);
@@ -99,19 +165,28 @@ function buildTicketPage(pdf, ticket, orgName, orgLogo, logoFit, qrDataUrl, page
   }
 }
 
-export async function buildTicketsPdfBuffer(tickets, orgName, orgLogo = '') {
-  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [60, 85] });
+export function buildTicketsPdfBuffer(tickets, orgName, orgLogo = '', assets) {
+  const pdf = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: [60, 85],
+    compress: true,
+  });
+
   if (tickets.length === 0) {
     return Buffer.from(pdf.output('arraybuffer'));
   }
 
-  const [logoFit, qrCodes] = await Promise.all([
-    Promise.resolve(resolveLogoFit(orgLogo)),
-    prefetchQrCodes(tickets),
-  ]);
+  const logoFit = assets?.logoFit ?? resolveLogoFit(orgLogo);
+  const logoImage = assets?.logo || orgLogo;
 
   for (let i = 0; i < tickets.length; i++) {
-    buildTicketPage(pdf, tickets[i], orgName, orgLogo, logoFit, qrCodes[i], i);
+    const ticket = tickets[i];
+    const qrImage = assets?.qrByTicketId?.get(ticket.id);
+    if (!qrImage) {
+      throw new Error(`QR manquant pour le ticket ${ticket.number}`);
+    }
+    buildTicketPage(pdf, ticket, orgName, logoImage, logoFit, qrImage, i);
   }
 
   return Buffer.from(pdf.output('arraybuffer'));

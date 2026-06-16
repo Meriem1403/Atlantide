@@ -220,13 +220,13 @@ function ExportByServicePage({
 
     setDownloading(true);
     setError('');
-    setProgress(`Génération de ${selectedCount} ticket(s) pour ${selectedServices.size} service(s)…`);
+    setProgress(`Préparation des ${selectedCount} tickets…`);
     try {
       await exportTicketsZipByService({
         month,
         status: statusFilter,
         services: [...selectedServices],
-      });
+      }, (label) => setProgress(label));
       setProgress('');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erreur lors de l\'export';
