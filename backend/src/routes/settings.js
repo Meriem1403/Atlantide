@@ -12,13 +12,13 @@ router.put('/', authenticateToken, requireRole('admin'), async (req, res) => {
     const { orgName, orgLogo, notificationEmail, mailFrom } = req.body;
     const result = await pool.query(
       `UPDATE settings SET
-         org_name = COALESCE($2, org_name),
-         org_logo = COALESCE($3, org_logo),
-         notification_email = COALESCE($4, notification_email),
-         mail_from = COALESCE($5, mail_from)
+         org_name = COALESCE($1, org_name),
+         org_logo = COALESCE($2, org_logo),
+         notification_email = COALESCE($3, notification_email),
+         mail_from = COALESCE($4, mail_from)
        WHERE id = 1
        RETURNING org_name, org_logo, notification_email, mail_from`,
-      [1, orgName, orgLogo, notificationEmail ?? null, mailFrom ?? null]
+      [orgName, orgLogo ?? null, notificationEmail ?? null, mailFrom ?? null]
     );
     res.json({
       orgName: result.rows[0].org_name,
