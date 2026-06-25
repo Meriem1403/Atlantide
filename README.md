@@ -62,11 +62,22 @@ Le frontend React est déployable sur [Netlify](https://www.netlify.com/). L'API
 
 ### 2. Variables d'environnement (Netlify)
 
-| Variable | Exemple | Description |
-|----------|---------|-------------|
-| `VITE_API_URL` | `https://api.mondomaine.fr/api` | URL de l'API (**avec** `/api` à la fin) |
+| Variable | Valeur recommandée | Description |
+|----------|-------------------|-------------|
+| `VITE_API_URL` | `/api` ou **supprimer** la variable | L'API est proxifiée via `netlify.toml` (même domaine que le site) |
 
-> Sans `VITE_API_URL`, le build appellera `/api` sur le domaine Netlify (ne fonctionne que si l'API est proxifiée ailleurs).
+> **Important :** si `VITE_API_URL` est définie sur `https://….onrender.com/api` dans l'UI Netlify, **supprimez-la** ou remplacez-la par `/api`. Sinon le build ignore le proxy et les PC d'entreprise bloquent encore l'API.
+
+### Accès depuis un réseau professionnel (proxy DSI)
+
+Les proxies d'administration bloquent souvent `*.onrender.com` et parfois `*.netlify.app`.
+
+1. **Déjà configuré dans ce dépôt** : proxy `/api/*` → Render via [atlantide.netlify.app](https://atlantide.netlify.app/) (un seul domaine côté navigateur).
+2. **Si le site lui-même est bloqué** : demander à la DSI d'autoriser `https://atlantide.netlify.app` **ou** ajouter un domaine institutionnel (ex. `tickets.votre-domaine.gouv.fr`) dans Netlify → Domain settings.
+3. **Demande type à la DSI** : autoriser en HTTPS le domaine du site et le trafic API associé ; catégorie « outil métier / SaaS autorisé ».
+
+Sur Render, `FRONTEND_URL` doit contenir toutes les URLs du frontend (séparées par des virgules), ex. :
+`https://atlantide.netlify.app,https://tickets.votre-domaine.fr`
 
 ### 3. Variables côté backend (CORS + emails)
 
