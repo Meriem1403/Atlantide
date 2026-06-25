@@ -41,7 +41,15 @@ async function findUserByLogin(login) {
      WHERE LOWER(a.email) = $1`,
     [value],
   );
-  return viaAgent.rows[0] ?? null;
+  if (viaAgent.rows[0]) return viaAgent.rows[0];
+
+  const viaProvider = await pool.query(
+    `SELECT u.* FROM providers p
+     INNER JOIN users u ON u.role = 'provider' AND u.profile_id = p.id
+     WHERE LOWER(p.email) = $1`,
+    [value],
+  );
+  return viaProvider.rows[0] ?? null;
 }
 
 router.post('/login', async (req, res) => {

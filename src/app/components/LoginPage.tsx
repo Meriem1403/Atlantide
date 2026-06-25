@@ -8,7 +8,7 @@ interface Props {
 
 const ROLE_HINTS = [
   { role: 'admin', username: 'admin', password: 'admin123', label: 'Administrateur', color: '#4361EE' },
-  { role: 'provider', username: 'contact@la-pignata.fr', password: 'Prest@2026', label: 'Prestataire (ex.)', color: '#D97706' },
+  { role: 'provider', username: 'contact@labonnefourchette.fr', password: 'prest123', label: 'Prestataire (démo)', color: '#D97706' },
 ];
 
 export function LoginPage({ onLogin, onForgotPassword }: Props) {

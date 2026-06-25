@@ -138,6 +138,15 @@ async function migrate() {
       `INSERT INTO settings (id, org_name, org_logo) VALUES (1, 'DIRM Méditerranée', '')
        ON CONFLICT (id) DO NOTHING`
     );
+    await client.query(
+      `UPDATE users u
+       SET email = LOWER(p.email)
+       FROM providers p
+       WHERE u.role = 'provider'
+         AND u.profile_id = p.id
+         AND p.email <> ''
+         AND (u.email IS NULL OR u.email = '')`
+    );
     console.log('Migration terminée.');
   } finally {
     client.release();
