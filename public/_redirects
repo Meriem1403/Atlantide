@@ -1,0 +1,5 @@
+# Proxy API (200! = force) — doit rester avant la règle SPA
+/api/*  https://appticketsrepas.onrender.com/api/:splat  200!
+
+# Application monopage
+/*      /index.html  200
