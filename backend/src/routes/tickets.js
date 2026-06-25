@@ -8,6 +8,21 @@ import { streamTicketsZip } from '../services/ticketZipExport.js';
 
 const router = Router();
 
+router.post('/reset-used', authenticateToken, requireRole('admin'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE tickets
+       SET status = 'active', used_at = NULL, provider_id = NULL, provider_name = NULL
+       WHERE status = 'used'
+       RETURNING number`,
+    );
+    res.json({ resetCount: result.rowCount, numbers: result.rows.map((r) => r.number) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 router.post('/export-zip', authenticateToken, requireRole('admin'), async (req, res) => {
   try {
     const { month, status = 'active', services, orgName, orgLogo } = req.body;
