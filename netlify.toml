@@ -10,19 +10,7 @@
   # Appels API en relatif → même domaine que le site (contourne le blocage proxy vers onrender.com)
   VITE_API_URL = "/api"
 
-# Proxy API : le navigateur ne contacte que atlantide.netlify.app (pas onrender.com)
-# Important : cette règle doit rester AVANT la redirection SPA ci-dessous
-[[redirects]]
-  from = "/api/*"
-  to = "https://appticketsrepas.onrender.com/api/:splat"
-  status = 200
-  force = true
-
-# Application monopage (activation / reset mot de passe par URL)
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# Redirections : voir public/_redirects (proxy API + SPA)
 
 [[headers]]
   for = "/*"
