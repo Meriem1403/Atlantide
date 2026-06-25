@@ -29,8 +29,8 @@ const users = [
   { id: 'u3', username: 's.leroy', password: 'sophie2026', role: 'agent', profileId: 'ag3', name: 'Sophie Leroy' },
   { id: 'u4', username: 'l.bernard', password: 'lucas2026', role: 'agent', profileId: 'ag4', name: 'Lucas Bernard' },
   { id: 'u5', username: 'e.petit', password: 'emma2026', role: 'agent', profileId: 'ag5', name: 'Emma Petit' },
-  { id: 'u6', username: 'lafourchette', password: 'prest123', role: 'provider', profileId: 'pv1', name: 'La Bonne Fourchette' },
-  { id: 'u7', username: 'midiexpress', password: 'prest456', role: 'provider', profileId: 'pv2', name: 'Le Midi Express' },
+  { id: 'u6', username: 'lafourchette', email: 'contact@labonnefourchette.fr', password: 'prest123', role: 'provider', profileId: 'pv1', name: 'La Bonne Fourchette' },
+  { id: 'u7', username: 'midiexpress', email: 'contact@lemidiexpress.fr', password: 'prest456', role: 'provider', profileId: 'pv2', name: 'Le Midi Express' },
 ];
 
 function makeTickets(months, faceValue = 9.0, subsidy = 5.4, count = 22) {
@@ -104,9 +104,9 @@ async function seed() {
     for (const u of users) {
       const hash = await bcrypt.hash(u.password, 10);
       await client.query(
-        `INSERT INTO users (id, username, password_hash, role, profile_id, name)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
-        [u.id, u.username, hash, u.role, u.profileId, u.name]
+        `INSERT INTO users (id, username, email, password_hash, role, profile_id, name)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [u.id, u.username, u.email || '', hash, u.role, u.profileId, u.name]
       );
     }
 
