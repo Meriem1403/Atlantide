@@ -9,8 +9,19 @@ import { downloadTicketPDF, downloadBatchTicketsPDF, ServiceTicketGroup } from '
 import { TicketVisual } from '../shared/TicketVisual';
 import { AdminFormLayout } from '../shared/AdminFormLayout';
 import { FilterSelect, MonthInput } from '../shared/FilterSelect';
+import { FormInput } from '../shared/AdminFormFields';
 
 const PER_PAGE = 12;
+
+type AgentTariff = { faceValue: number; subsidy: number };
+
+function resolveSubventionForAgent(agentId: string, subventions: SubventionConfig[]): SubventionConfig | undefined {
+  const specific = subventions.find(
+    sv => sv.active && Array.isArray(sv.appliesTo) && sv.appliesTo.includes(agentId),
+  );
+  if (specific) return specific;
+  return subventions.find(sv => sv.active && sv.appliesTo === 'all');
+}
 
 interface Props {
   route: string;
@@ -74,13 +85,14 @@ function buildAgentRows(
     .filter(a => a.active)
     .map(agent => {
       const plan = plansByAgent.get(agent.id);
+      const subvention = resolveSubventionForAgent(agent.id, subventions);
       return {
         agent,
         plan,
         service: plan?.serviceName ?? agent.department,
-        count: plan?.ticketCount ?? global?.ticketsPerMonth ?? 23,
-        faceValue: plan?.faceValue ?? global?.faceValue ?? 5.24,
-        subsidy: plan?.subsidy ?? global?.subsidy ?? 3.14,
+        count: plan?.ticketCount ?? subvention?.ticketsPerMonth ?? global?.ticketsPerMonth ?? 23,
+        faceValue: plan?.faceValue ?? subvention?.faceValue ?? global?.faceValue ?? 5.24,
+        subsidy: plan?.subsidy ?? subvention?.subsidy ?? global?.subsidy ?? 3.14,
         existingTickets: tickets.filter(t => t.agentId === agent.id && t.month === month && t.status !== 'cancelled').length,
       };
     })
@@ -367,11 +379,28 @@ function GeneratePage({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<{ agentCount: number; totalTickets: number } | null>(null);
+  const [tariffOverrides, setTariffOverrides] = useState<Record<string, AgentTariff>>({});
 
   const allRows = useMemo(
     () => buildAgentRows(agents, monthlyPlans, subventions, tickets, month),
     [agents, monthlyPlans, subventions, tickets, month],
   );
+
+  useEffect(() => {
+    setTariffOverrides({});
+  }, [month]);
+
+  const getTariff = (row: AgentRow): AgentTariff => {
+    const defaults = { faceValue: row.faceValue, subsidy: row.subsidy };
+    return { ...defaults, ...tariffOverrides[row.agent.id] };
+  };
+
+  const updateTariff = (agentId: string, row: AgentRow, patch: Partial<AgentTariff>) => {
+    setTariffOverrides(prev => ({
+      ...prev,
+      [agentId]: { ...getTariff(row), ...patch },
+    }));
+  };
 
   const services = useMemo(
     () => [...new Set(allRows.map(r => r.service))].sort((a, b) => a.localeCompare(b, 'fr')),
@@ -400,18 +429,24 @@ function GeneratePage({
 
   const selectedRows = allRows.filter(r => selectedIds.has(r.agent.id) && r.count > 0);
   const totalTickets = selectedRows.reduce((s, r) => s + r.count, 0);
-  const totalSubsidy = selectedRows.reduce((s, r) => s + r.subsidy * r.count, 0);
+  const totalSubsidy = selectedRows.reduce((s, r) => {
+    const tariff = getTariff(r);
+    return s + tariff.subsidy * r.count;
+  }, 0);
 
   const handleGenerate = async () => {
     if (!selectedRows.length) return;
     setGenerating(true);
     try {
-      const items: TicketGenerationItem[] = selectedRows.map(r => ({
-        agentId: r.agent.id,
-        count: r.count,
-        faceValue: r.faceValue,
-        subsidy: r.subsidy,
-      }));
+      const items: TicketGenerationItem[] = selectedRows.map(r => {
+        const tariff = getTariff(r);
+        return {
+          agentId: r.agent.id,
+          count: r.count,
+          faceValue: tariff.faceValue,
+          subsidy: tariff.subsidy,
+        };
+      });
       const res = await onGenerateBatch(month, items);
       setResult({ agentCount: res.agentCount, totalTickets: res.totalTickets });
       setSelectedIds(new Set());
@@ -425,7 +460,7 @@ function GeneratePage({
     <div className="flex flex-col h-full overflow-hidden" style={{ background: '#F0F2F7' }}>
       <PageHeader
         title="Générer des tickets"
-        sub="Sélectionnez un ou plusieurs agents, par service ou individuellement"
+        sub="Sélectionnez les agents et ajustez le barème (ticket / subvention) si besoin avant de générer"
         onBack={() => navigate('tickets')}
       />
       <div className="flex-1 overflow-y-auto p-6 lg:p-8">
@@ -458,6 +493,11 @@ function GeneratePage({
               </FilterSelect>
             </div>
           </div>
+
+          <p style={{ fontSize: 12, color: '#6B7280', lineHeight: 1.5 }}>
+            Montants par défaut : plan mensuel (Datadoc), barème <strong>Subventions</strong>, ou valeurs standard.
+            Cochez un agent pour modifier ticket et subvention uniquement pour cette génération.
+          </p>
 
           <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid rgba(17,24,39,0.07)' }}>
             <div className="px-5 py-4 border-b border-border flex flex-wrap items-center justify-between gap-3">
@@ -497,37 +537,80 @@ function GeneratePage({
               {visibleRows.map(row => {
                 const selected = selectedIds.has(row.agent.id);
                 const disabled = row.count === 0;
+                const tariff = getTariff(row);
                 return (
-                  <button
+                  <div
                     key={row.agent.id}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => !disabled && toggleAgent(row.agent.id)}
-                    className="w-full flex items-start gap-3 px-5 py-3.5 text-left transition-colors disabled:opacity-40"
-                    style={{ background: selected ? '#EEF2FF' : 'transparent' }}
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-3.5 transition-colors disabled:opacity-40"
+                    style={{ background: selected ? '#F8FAFF' : 'transparent', opacity: disabled ? 0.4 : 1 }}
                   >
-                    {selected
-                      ? <CheckSquare className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#4361EE' }} />
-                      : <Square className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" />}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>{row.agent.name}</span>
-                        <span className="px-2 py-0.5 rounded-full" style={{ fontSize: 10, fontWeight: 600, background: '#F3F4F6', color: '#6B7280' }}>
-                          {row.service}
-                        </span>
-                        {row.existingTickets > 0 && (
-                          <span className="px-2 py-0.5 rounded-full" style={{ fontSize: 10, fontWeight: 600, background: '#FEF3C7', color: '#D97706' }}>
-                            {row.existingTickets} déjà généré{row.existingTickets > 1 ? 's' : ''}
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => !disabled && toggleAgent(row.agent.id)}
+                      className="flex flex-1 items-start gap-3 text-left min-w-0"
+                    >
+                      {selected
+                        ? <CheckSquare className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#4361EE' }} />
+                        : <Square className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" />}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>{row.agent.name}</span>
+                          <span className="px-2 py-0.5 rounded-full" style={{ fontSize: 10, fontWeight: 600, background: '#F3F4F6', color: '#6B7280' }}>
+                            {row.service}
                           </span>
-                        )}
+                          {row.existingTickets > 0 && (
+                            <span className="px-2 py-0.5 rounded-full" style={{ fontSize: 10, fontWeight: 600, background: '#FEF3C7', color: '#D97706' }}>
+                              {row.existingTickets} déjà généré{row.existingTickets > 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
+                          {row.count} tickets
+                          {row.plan?.numerotation ? ` · N° ${row.plan.numerotation}` : ''}
+                          {row.plan?.notes ? ` · ${row.plan.notes}` : ''}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
-                        {row.count} tickets · {row.faceValue.toFixed(2)} € (subv. {row.subsidy.toFixed(2)} €)
-                        {row.plan?.numerotation ? ` · N° ${row.plan.numerotation}` : ''}
-                        {row.plan?.notes ? ` · ${row.plan.notes}` : ''}
+                    </button>
+
+                    {selected && !disabled && (
+                      <div className="flex shrink-0 items-end gap-2 sm:pl-0 pl-7" onClick={e => e.stopPropagation()}>
+                        <div>
+                          <label style={{ fontSize: 10, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4 }}>
+                            Ticket (€)
+                          </label>
+                          <FormInput
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={tariff.faceValue}
+                            onChange={e => updateTariff(row.agent.id, row, { faceValue: Number(e.target.value) })}
+                            className="!py-2 !px-3 w-24"
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 10, fontWeight: 600, color: '#4361EE', display: 'block', marginBottom: 4 }}>
+                            Subvention (€)
+                          </label>
+                          <FormInput
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max={tariff.faceValue}
+                            value={tariff.subsidy}
+                            onChange={e => updateTariff(row.agent.id, row, { subsidy: Number(e.target.value) })}
+                            className="!py-2 !px-3 w-24"
+                          />
+                        </div>
                       </div>
-                    </div>
-                  </button>
+                    )}
+
+                    {!selected && !disabled && (
+                      <div className="shrink-0 pl-7 sm:pl-0 text-right" style={{ fontSize: 12, color: '#6B7280' }}>
+                        {tariff.faceValue.toFixed(2)} € · subv. {tariff.subsidy.toFixed(2)} €
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
