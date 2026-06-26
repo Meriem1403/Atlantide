@@ -5,6 +5,7 @@ import { mapTicket } from '../utils/mappers.js';
 import { generateForAgent } from '../services/ticketGeneration.js';
 import { notifyTicketsGenerated, notifyTicketValidated } from '../services/notifications.js';
 import { streamTicketsZip } from '../services/ticketZipExport.js';
+import { validateTicketAmounts } from '../utils/ticketAmounts.js';
 
 const router = Router();
 
@@ -52,6 +53,47 @@ router.post('/export-zip', authenticateToken, requireRole('admin'), async (req, 
     if (!res.headersSent) {
       res.status(500).json({ error: 'Erreur lors de l\'export ZIP' });
     }
+  }
+});
+
+router.post('/purge-generated', authenticateToken, requireRole('admin'), async (req, res) => {
+  try {
+    const { month, agentIds } = req.body;
+    if (!month) return res.status(400).json({ error: 'Mois requis' });
+
+    const usedCheck = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM tickets
+       WHERE month = $1 AND status = 'used'
+       ${Array.isArray(agentIds) && agentIds.length ? 'AND agent_id = ANY($2::text[])' : ''}`,
+      Array.isArray(agentIds) && agentIds.length ? [month, agentIds] : [month],
+    );
+    if (usedCheck.rows[0].count > 0) {
+      return res.status(400).json({
+        error: `${usedCheck.rows[0].count} ticket(s) déjà utilisé(s). Suppression impossible.`,
+      });
+    }
+
+    const params = [month];
+    let sql = `DELETE FROM tickets WHERE month = $1 AND status = 'active'`;
+    if (Array.isArray(agentIds) && agentIds.length) {
+      sql += ' AND agent_id = ANY($2::text[])';
+      params.push(agentIds);
+    }
+    sql += ' RETURNING id, number, agent_id, agent_name';
+
+    const result = await pool.query(sql, params);
+    res.json({
+      deletedCount: result.rowCount,
+      tickets: result.rows.map((r) => ({
+        id: r.id,
+        number: r.number,
+        agentId: r.agent_id,
+        agentName: r.agent_name,
+      })),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 

@@ -3,13 +3,24 @@ import pool from '../config/database.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { mapSubvention } from '../utils/mappers.js';
 import { newId } from '../utils/tickets.js';
+import { validateTicketAmounts } from '../utils/ticketAmounts.js';
 
 const router = Router();
 router.use(authenticateToken, requireRole('admin'));
 
+function rejectInvalidAmounts(res, faceValue, subsidy) {
+  const error = validateTicketAmounts(faceValue, subsidy);
+  if (error) {
+    res.status(400).json({ error });
+    return true;
+  }
+  return false;
+}
+
 router.post('/', async (req, res) => {
   try {
     const { label, faceValue, subsidy, ticketsPerMonth, appliesTo, active = true } = req.body;
+    if (rejectInvalidAmounts(res, faceValue, subsidy)) return;
     const id = newId();
     const result = await pool.query(
       `INSERT INTO subventions (id, label, face_value, subsidy, tickets_per_month, applies_to, active)
@@ -30,6 +41,9 @@ router.put('/:id', async (req, res) => {
     if (!current.rows.length) return res.status(404).json({ error: 'Subvention introuvable' });
 
     const row = current.rows[0];
+    const nextFace = faceValue ?? row.face_value;
+    const nextSubsidy = subsidy ?? row.subsidy;
+    if (rejectInvalidAmounts(res, nextFace, nextSubsidy)) return;
     const result = await pool.query(
       `UPDATE subventions SET label = $2, face_value = $3, subsidy = $4, tickets_per_month = $5,
        applies_to = $6, active = $7 WHERE id = $1 RETURNING *`,

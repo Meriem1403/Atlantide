@@ -120,6 +120,8 @@ export default function App() {
     api.generateTicketsBatch(month, items)), [wrap]);
   const cancelTicket = useCallback(wrap((id: string) => api.cancelTicket(id)), [wrap]);
   const deleteTicket = useCallback(wrap((id: string) => api.deleteTicket(id)), [wrap]);
+  const purgeGeneratedTickets = useCallback(wrap((month: string, agentIds?: string[]) =>
+    api.purgeGeneratedTickets(month, agentIds)), [wrap]);
   const approveInvoice = useCallback(wrap((id: string, note: string) => api.approveInvoice(id, note)), [wrap]);
   const rejectInvoice = useCallback(wrap((id: string, note: string) => api.rejectInvoice(id, note)), [wrap]);
   const updateSettings = useCallback(wrap((orgName: string, orgLogo: string, notificationEmail?: string, mailFrom?: string) =>
@@ -191,6 +193,7 @@ export default function App() {
       onCreateProvider={createProvider} onUpdateProvider={updateProvider} onDeleteProvider={deleteProvider}
       onCreateSubvention={createSubvention} onUpdateSubvention={updateSubvention} onDeleteSubvention={deleteSubvention}
       onGenerateTicketsBatch={generateTicketsBatch} onCancelTicket={cancelTicket} onDeleteTicket={deleteTicket}
+      onPurgeGeneratedTickets={purgeGeneratedTickets}
       onApproveInvoice={approveInvoice} onRejectInvoice={rejectInvoice}
       onUpdateSettings={updateSettings}
     />
