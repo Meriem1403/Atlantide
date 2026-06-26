@@ -62,9 +62,14 @@ export default function App() {
         return;
       }
       try {
-        const data = await api.fetchAppState();
-        setState(data);
-        setCurrentUser(await api.getMe());
+        const boot = Promise.all([
+          api.fetchAppState().then(setState),
+          api.getMe().then(setCurrentUser),
+        ]);
+        const timeout = new Promise<never>((_, reject) => {
+          window.setTimeout(() => reject(new Error('timeout')), 20_000);
+        });
+        await Promise.race([boot, timeout]);
       } catch {
         api.logout();
       } finally {

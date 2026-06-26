@@ -1,6 +1,15 @@
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
-
 const TOKEN_KEY = 'ticketsrepas_token';
+
+/** Sur Netlify, toujours passer par le proxy /api (ignore l'ancienne URL Render en dur dans le build). */
+export function getApiBase(): string {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host.endsWith('netlify.app') || host.endsWith('netlify.com')) {
+      return '/api';
+    }
+  }
+  return import.meta.env.VITE_API_URL || '/api';
+}
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -30,7 +39,7 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, { ...fetchOptions, headers, signal: controller.signal });
+    res = await fetch(`${getApiBase()}${path}`, { ...fetchOptions, headers, signal: controller.signal });
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
       throw new Error('Le serveur met trop de temps à répondre (démarrage Render). Attendez 30 secondes et réessayez.');
@@ -41,6 +50,11 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
   }
 
   if (res.status === 204) return undefined as T;
+
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error('Le serveur API ne répond pas correctement. Réessayez dans quelques instants.');
+  }
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {

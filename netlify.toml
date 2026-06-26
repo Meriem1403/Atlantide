@@ -7,10 +7,20 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  # Appels API en relatif → même domaine que le site (contourne le blocage proxy vers onrender.com)
   VITE_API_URL = "/api"
 
-# Redirections : voir public/_redirects (proxy API + SPA)
+# Proxy API — même domaine que le site (obligatoire pour les réseaux avec proxy DSI)
+[[redirects]]
+  from = "/api/*"
+  to = "https://appticketsrepas.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+# Application monopage
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
 
 [[headers]]
   for = "/*"

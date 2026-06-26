@@ -1,9 +1,7 @@
 import {
   AppState, CurrentUser, Agent, Provider, SubventionConfig, ProviderInvoice,
 } from '../types';
-import { apiFetch, getToken, setToken, wakeApi } from './client';
-
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+import { apiFetch, getApiBase, getToken, setToken, wakeApi } from './client';
 
 export { wakeApi };
 
@@ -164,7 +162,7 @@ export async function exportTicketsZipByService(
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/tickets/export-zip`, {
+    res = await fetch(`${getApiBase()}/tickets/export-zip`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
