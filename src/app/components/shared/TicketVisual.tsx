@@ -53,9 +53,14 @@ export function TicketVisual({ ticket, orgName, orgLogo = '', compact = false }:
           )}
         </div>
 
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: 500, marginBottom: 4 }}>Valeur du ticket</div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: 500, marginBottom: 4 }}>Valeur totale du ticket</div>
         <div style={{ fontSize: compact ? 40 : 52, fontWeight: 800, color: 'white', letterSpacing: '-1px', lineHeight: 1 }}>
           {ticket.faceValue.toFixed(2)}<span style={{ fontSize: compact ? 22 : 28, marginLeft: 4 }}>€</span>
+        </div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 8, lineHeight: 1.5 }}>
+          Subvention employeur · {ticket.subsidy.toFixed(2)} €
+          <br />
+          Reste à charge agent · {(ticket.agentContribution ?? Math.max(0, ticket.faceValue - ticket.subsidy)).toFixed(2)} €
         </div>
         <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 6 }}>Valable · {monthLabel}</div>
 

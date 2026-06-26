@@ -59,6 +59,15 @@ function SubventionForm({
   const agentPart = Math.max(0, form.faceValue - form.subsidy);
 
   const handleSave = () => {
+    if (!form.label.trim()) return;
+    if (form.faceValue <= 0) {
+      window.alert('La valeur faciale doit être supérieure à 0 €.');
+      return;
+    }
+    if (form.subsidy < 0 || form.subsidy > form.faceValue) {
+      window.alert('La subvention doit être entre 0 € et la valeur faciale.');
+      return;
+    }
     const appliesTo = targetMode === 'all' ? 'all' : selectedAgents;
     onSubmit({ ...form, appliesTo });
     navigate('subventions');

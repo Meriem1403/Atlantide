@@ -45,6 +45,7 @@ interface Props {
   onUpdateSubvention: (id: string, s: Partial<SubventionConfig>) => void;
   onDeleteSubvention: (id: string) => void;
   onGenerateTicketsBatch: (month: string, items: import('../../api').TicketGenerationItem[]) => Promise<{ agentCount: number; totalTickets: number }>;
+  onPurgeGeneratedTickets: (month: string, agentIds?: string[]) => Promise<{ deletedCount: number }>;
   onCancelTicket: (id: string) => void;
   onDeleteTicket: (id: string) => void;
   onApproveInvoice: (id: string, note: string) => void;
@@ -355,7 +356,8 @@ export function AdminApp(props: Props) {
         tickets={state.tickets} agents={state.agents} subventions={state.subventions}
         monthlyPlans={state.monthlyPlans}
         orgName={state.orgName} orgLogo={state.orgLogo}
-        onGenerateBatch={props.onGenerateTicketsBatch} onCancel={props.onCancelTicket} onDelete={props.onDeleteTicket} />
+        onGenerateBatch={props.onGenerateTicketsBatch} onPurgeGenerated={props.onPurgeGeneratedTickets}
+        onCancel={props.onCancelTicket} onDelete={props.onDeleteTicket} />
     );
     if (route.startsWith('subventions')) return (
       <SubventionsCRUD route={route} navigate={navigate}

@@ -141,6 +141,13 @@ export async function deleteTicket(id: string) {
   return apiFetch<void>(`/tickets/${id}`, { method: 'DELETE' });
 }
 
+export async function purgeGeneratedTickets(month: string, agentIds?: string[]) {
+  return apiFetch<{ deletedCount: number }>('/tickets/purge-generated', {
+    method: 'POST',
+    body: JSON.stringify({ month, agentIds }),
+  });
+}
+
 export async function validateTicket(ticketNumber: string): Promise<{ success: boolean; message: string }> {
   return apiFetch('/tickets/validate', {
     method: 'POST',

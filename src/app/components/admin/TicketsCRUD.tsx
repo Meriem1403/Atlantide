@@ -10,10 +10,11 @@ import { TicketVisual } from '../shared/TicketVisual';
 import { AdminFormLayout } from '../shared/AdminFormLayout';
 import { FilterSelect, MonthInput } from '../shared/FilterSelect';
 import { FormInput } from '../shared/AdminFormFields';
+import { agentContribution, resolveTicketAmounts, validateTicketAmounts } from '../../utils/ticketAmounts';
 
 const PER_PAGE = 12;
 
-type AgentTariff = { faceValue: number; subsidy: number };
+type AgentGenerationOverride = { count: number; faceValue: number; subsidy: number };
 
 function resolveSubventionForAgent(agentId: string, subventions: SubventionConfig[]): SubventionConfig | undefined {
   const specific = subventions.find(
@@ -32,7 +33,8 @@ interface Props {
   monthlyPlans?: AgentMonthlyPlan[];
   orgName: string;
   orgLogo: string;
-  onGenerateBatch: (month: string, items: TicketGenerationItem[]) => void;
+  onGenerateBatch: (month: string, items: TicketGenerationItem[]) => Promise<{ agentCount: number; totalTickets: number }>;
+  onPurgeGenerated: (month: string, agentIds?: string[]) => Promise<{ deletedCount: number }>;
   onCancel: (id: string) => void;
   onDelete: (id: string) => void;
 }
@@ -86,13 +88,21 @@ function buildAgentRows(
     .map(agent => {
       const plan = plansByAgent.get(agent.id);
       const subvention = resolveSubventionForAgent(agent.id, subventions);
+      const amounts = resolveTicketAmounts(
+        [
+          { faceValue: plan?.faceValue, subsidy: plan?.subsidy },
+          { faceValue: subvention?.faceValue, subsidy: subvention?.subsidy },
+          { faceValue: global?.faceValue, subsidy: global?.subsidy },
+        ],
+        { faceValue: 5.24, subsidy: 3.14 },
+      );
       return {
         agent,
         plan,
         service: plan?.serviceName ?? agent.department,
         count: plan?.ticketCount ?? subvention?.ticketsPerMonth ?? global?.ticketsPerMonth ?? 23,
-        faceValue: plan?.faceValue ?? subvention?.faceValue ?? global?.faceValue ?? 5.24,
-        subsidy: plan?.subsidy ?? subvention?.subsidy ?? global?.subsidy ?? 3.14,
+        faceValue: amounts.faceValue,
+        subsidy: amounts.subsidy,
         existingTickets: tickets.filter(t => t.agentId === agent.id && t.month === month && t.status !== 'cancelled').length,
       };
     })
@@ -364,13 +374,14 @@ function ExportByServicePage({
 
 // ── Generate page ─────────────────────────────────────────────────────────────
 function GeneratePage({
-  agents, subventions, monthlyPlans = [], tickets, onGenerateBatch, navigate,
+  agents, subventions, monthlyPlans = [], tickets, onGenerateBatch, onPurgeGenerated, navigate,
 }: {
   agents: Agent[];
   subventions: SubventionConfig[];
   monthlyPlans?: AgentMonthlyPlan[];
   tickets: Ticket[];
   onGenerateBatch: Props['onGenerateBatch'];
+  onPurgeGenerated: Props['onPurgeGenerated'];
   navigate: (r: AdminRoute) => void;
 }) {
   const defaultMonth = monthlyPlans[0]?.month ?? '2026-07';
@@ -378,8 +389,10 @@ function GeneratePage({
   const [serviceFilter, setServiceFilter] = useState('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [generating, setGenerating] = useState(false);
+  const [purging, setPurging] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [result, setResult] = useState<{ agentCount: number; totalTickets: number } | null>(null);
-  const [tariffOverrides, setTariffOverrides] = useState<Record<string, AgentTariff>>({});
+  const [generationOverrides, setGenerationOverrides] = useState<Record<string, AgentGenerationOverride>>({});
 
   const allRows = useMemo(
     () => buildAgentRows(agents, monthlyPlans, subventions, tickets, month),
@@ -387,18 +400,18 @@ function GeneratePage({
   );
 
   useEffect(() => {
-    setTariffOverrides({});
+    setGenerationOverrides({});
   }, [month]);
 
-  const getTariff = (row: AgentRow): AgentTariff => {
-    const defaults = { faceValue: row.faceValue, subsidy: row.subsidy };
-    return { ...defaults, ...tariffOverrides[row.agent.id] };
+  const getGenerationParams = (row: AgentRow): AgentGenerationOverride => {
+    const defaults = { count: row.count, faceValue: row.faceValue, subsidy: row.subsidy };
+    return { ...defaults, ...generationOverrides[row.agent.id] };
   };
 
-  const updateTariff = (agentId: string, row: AgentRow, patch: Partial<AgentTariff>) => {
-    setTariffOverrides(prev => ({
+  const updateGenerationParams = (agentId: string, row: AgentRow, patch: Partial<AgentGenerationOverride>) => {
+    setGenerationOverrides(prev => ({
       ...prev,
-      [agentId]: { ...getTariff(row), ...patch },
+      [agentId]: { ...getGenerationParams(row), ...patch },
     }));
   };
 
@@ -412,7 +425,7 @@ function GeneratePage({
     [allRows, serviceFilter],
   );
 
-  const selectableRows = visibleRows.filter(r => r.count > 0);
+  const selectableRows = visibleRows;
   const allVisibleSelected = selectableRows.length > 0 && selectableRows.every(r => selectedIds.has(r.agent.id));
 
   const toggleAgent = (id: string) => {
@@ -427,24 +440,36 @@ function GeneratePage({
   const selectAllVisible = () => setSelectedIds(new Set(selectableRows.map(r => r.agent.id)));
   const clearSelection = () => setSelectedIds(new Set());
 
-  const selectedRows = allRows.filter(r => selectedIds.has(r.agent.id) && r.count > 0);
-  const totalTickets = selectedRows.reduce((s, r) => s + r.count, 0);
+  const selectedRows = allRows.filter(r => {
+    if (!selectedIds.has(r.agent.id)) return false;
+    return getGenerationParams(r).count > 0;
+  });
+  const totalTickets = selectedRows.reduce((s, r) => s + getGenerationParams(r).count, 0);
   const totalSubsidy = selectedRows.reduce((s, r) => {
-    const tariff = getTariff(r);
-    return s + tariff.subsidy * r.count;
+    const params = getGenerationParams(r);
+    return s + params.subsidy * params.count;
   }, 0);
 
   const handleGenerate = async () => {
     if (!selectedRows.length) return;
+    for (const row of selectedRows) {
+      const params = getGenerationParams(row);
+      const error = validateTicketAmounts(params.faceValue, params.subsidy);
+      if (error) {
+        setFormError(`${row.agent.name} : ${error}`);
+        return;
+      }
+    }
+    setFormError(null);
     setGenerating(true);
     try {
       const items: TicketGenerationItem[] = selectedRows.map(r => {
-        const tariff = getTariff(r);
+        const params = getGenerationParams(r);
         return {
           agentId: r.agent.id,
-          count: r.count,
-          faceValue: tariff.faceValue,
-          subsidy: tariff.subsidy,
+          count: params.count,
+          faceValue: params.faceValue,
+          subsidy: params.subsidy,
         };
       });
       const res = await onGenerateBatch(month, items);
@@ -456,11 +481,34 @@ function GeneratePage({
     }
   };
 
+  const handlePurge = async () => {
+    const agentIds = [...selectedIds];
+    if (!agentIds.length) return;
+    const existing = allRows.filter(r => agentIds.includes(r.agent.id) && r.existingTickets > 0);
+    const label = existing.map(r => r.agent.name).join(', ');
+    if (!window.confirm(
+      `Supprimer les tickets actifs de ${month} pour ${agentIds.length} agent(s)${label ? ` (${label})` : ''} ?\n\nLes tickets déjà utilisés ne seront pas supprimés.`,
+    )) return;
+
+    setFormError(null);
+    setPurging(true);
+    try {
+      const res = await onPurgeGenerated(month, agentIds);
+      setResult({ agentCount: agentIds.length, totalTickets: -res.deletedCount });
+      setSelectedIds(new Set());
+      setTimeout(() => { setResult(null); }, 2500);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Suppression impossible');
+    } finally {
+      setPurging(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full overflow-hidden" style={{ background: '#F0F2F7' }}>
       <PageHeader
         title="Générer des tickets"
-        sub="Sélectionnez les agents et ajustez le barème (ticket / subvention) si besoin avant de générer"
+        sub="Sélectionnez les agents et ajustez nombre, ticket et subvention avant de générer"
         onBack={() => navigate('tickets')}
       />
       <div className="flex-1 overflow-y-auto p-6 lg:p-8">
@@ -470,11 +518,21 @@ function GeneratePage({
             <div className="p-4 rounded-2xl flex items-center gap-3" style={{ background: '#DCFCE7', border: '1px solid #86EFAC' }}>
               <span style={{ fontSize: 20 }}>✅</span>
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#16A34A' }}>Génération terminée</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#16A34A' }}>
+                  {result.totalTickets < 0 ? 'Suppression terminée' : 'Génération terminée'}
+                </div>
                 <div style={{ fontSize: 13, color: '#15803D' }}>
-                  {result.totalTickets} tickets pour {result.agentCount} agent{result.agentCount > 1 ? 's' : ''}
+                  {result.totalTickets < 0
+                    ? `${Math.abs(result.totalTickets)} ticket(s) supprimé(s) pour ${result.agentCount} agent(s)`
+                    : `${result.totalTickets} tickets pour ${result.agentCount} agent${result.agentCount > 1 ? 's' : ''}`}
                 </div>
               </div>
+            </div>
+          )}
+
+          {formError && (
+            <div className="p-4 rounded-2xl" style={{ background: '#FEE2E2', border: '1px solid #FCA5A5', fontSize: 13, color: '#B91C1C' }}>
+              {formError}
             </div>
           )}
 
@@ -495,8 +553,8 @@ function GeneratePage({
           </div>
 
           <p style={{ fontSize: 12, color: '#6B7280', lineHeight: 1.5 }}>
-            Montants par défaut : plan mensuel (Datadoc), barème <strong>Subventions</strong>, ou valeurs standard.
-            Cochez un agent pour modifier ticket et subvention uniquement pour cette génération.
+            Valeurs par défaut : plan mensuel (Datadoc), barème <strong>Subventions</strong>, ou standard.
+            Cochez un agent pour modifier le nombre de tickets, la valeur ticket et la subvention pour cette génération uniquement.
           </p>
 
           <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid rgba(17,24,39,0.07)' }}>
@@ -536,18 +594,16 @@ function GeneratePage({
 
               {visibleRows.map(row => {
                 const selected = selectedIds.has(row.agent.id);
-                const disabled = row.count === 0;
-                const tariff = getTariff(row);
+                const params = getGenerationParams(row);
                 return (
                   <div
                     key={row.agent.id}
-                    className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-3.5 transition-colors disabled:opacity-40"
-                    style={{ background: selected ? '#F8FAFF' : 'transparent', opacity: disabled ? 0.4 : 1 }}
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-3.5 transition-colors"
+                    style={{ background: selected ? '#F8FAFF' : 'transparent' }}
                   >
                     <button
                       type="button"
-                      disabled={disabled}
-                      onClick={() => !disabled && toggleAgent(row.agent.id)}
+                      onClick={() => toggleAgent(row.agent.id)}
                       className="flex flex-1 items-start gap-3 text-left min-w-0"
                     >
                       {selected
@@ -566,15 +622,28 @@ function GeneratePage({
                           )}
                         </div>
                         <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
-                          {row.count} tickets
-                          {row.plan?.numerotation ? ` · N° ${row.plan.numerotation}` : ''}
-                          {row.plan?.notes ? ` · ${row.plan.notes}` : ''}
+                          {row.plan?.numerotation ? `N° ${row.plan.numerotation}` : ''}
+                          {row.plan?.numerotation && row.plan?.notes ? ' · ' : ''}
+                          {row.plan?.notes ?? ''}
                         </div>
                       </div>
                     </button>
 
-                    {selected && !disabled && (
-                      <div className="flex shrink-0 items-end gap-2 sm:pl-0 pl-7" onClick={e => e.stopPropagation()}>
+                    {selected ? (
+                      <div className="flex shrink-0 flex-wrap items-end gap-2 sm:pl-0 pl-7" onClick={e => e.stopPropagation()}>
+                        <div>
+                          <label style={{ fontSize: 10, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>
+                            Nb tickets
+                          </label>
+                          <FormInput
+                            type="number"
+                            step="1"
+                            min="1"
+                            value={params.count}
+                            onChange={e => updateGenerationParams(row.agent.id, row, { count: Math.max(1, Number(e.target.value) || 1) })}
+                            className="!py-2 !px-3 w-20"
+                          />
+                        </div>
                         <div>
                           <label style={{ fontSize: 10, fontWeight: 600, color: '#6B7280', display: 'block', marginBottom: 4 }}>
                             Ticket (€)
@@ -583,8 +652,8 @@ function GeneratePage({
                             type="number"
                             step="0.01"
                             min="0"
-                            value={tariff.faceValue}
-                            onChange={e => updateTariff(row.agent.id, row, { faceValue: Number(e.target.value) })}
+                            value={params.faceValue}
+                            onChange={e => updateGenerationParams(row.agent.id, row, { faceValue: Number(e.target.value) })}
                             className="!py-2 !px-3 w-24"
                           />
                         </div>
@@ -596,18 +665,18 @@ function GeneratePage({
                             type="number"
                             step="0.01"
                             min="0"
-                            max={tariff.faceValue}
-                            value={tariff.subsidy}
-                            onChange={e => updateTariff(row.agent.id, row, { subsidy: Number(e.target.value) })}
+                            max={params.faceValue}
+                            value={params.subsidy}
+                            onChange={e => updateGenerationParams(row.agent.id, row, { subsidy: Number(e.target.value) })}
                             className="!py-2 !px-3 w-24"
                           />
                         </div>
                       </div>
-                    )}
-
-                    {!selected && !disabled && (
+                    ) : (
                       <div className="shrink-0 pl-7 sm:pl-0 text-right" style={{ fontSize: 12, color: '#6B7280' }}>
-                        {tariff.faceValue.toFixed(2)} € · subv. {tariff.subsidy.toFixed(2)} €
+                        {params.count} ticket{params.count > 1 ? 's' : ''} · {params.faceValue.toFixed(2)} €
+                        <br />
+                        subv. {params.subsidy.toFixed(2)} € · agent {agentContribution(params.faceValue, params.subsidy).toFixed(2)} €
                       </div>
                     )}
                   </div>
@@ -631,10 +700,21 @@ function GeneratePage({
             </div>
           )}
 
-          <div className="flex gap-3 pb-4">
+          <div className="flex flex-wrap gap-3 pb-4">
             <button onClick={() => navigate('tickets')} className="px-5 py-2.5 rounded-xl border border-border bg-white" style={{ fontSize: 14, fontWeight: 500 }}>
               Annuler
             </button>
+            {selectedIds.size > 0 && (
+              <button
+                type="button"
+                onClick={handlePurge}
+                disabled={purging || generating || !!result}
+                className="px-5 py-2.5 rounded-xl border transition-all disabled:opacity-40"
+                style={{ fontSize: 14, fontWeight: 600, borderColor: '#FCA5A5', color: '#DC2626', background: '#FEF2F2' }}
+              >
+                {purging ? 'Suppression…' : 'Supprimer les tickets du mois (sélection)'}
+              </button>
+            )}
             <button
               onClick={handleGenerate}
               disabled={!selectedRows.length || generating || !!result}
@@ -704,7 +784,7 @@ function ViewPage({ ticket, orgName, orgLogo, navigate }: { ticket: Ticket; orgN
 }
 
 // ── List page ─────────────────────────────────────────────────────────────────
-export function TicketsCRUD({ route, navigate, tickets, agents, subventions, monthlyPlans = [], orgName, orgLogo, onGenerateBatch, onCancel, onDelete }: Props) {
+export function TicketsCRUD({ route, navigate, tickets, agents, subventions, monthlyPlans = [], orgName, orgLogo, onGenerateBatch, onPurgeGenerated, onCancel, onDelete }: Props) {
   const [search, setSearch] = useState('');
   const [filterService, setFilterService] = useState('all');
   const [filterAgent, setFilterAgent] = useState('all');
@@ -760,7 +840,7 @@ export function TicketsCRUD({ route, navigate, tickets, agents, subventions, mon
 
   if (route === 'tickets/generate') return (
     <GeneratePage agents={agents} subventions={subventions} monthlyPlans={monthlyPlans} tickets={tickets}
-      onGenerateBatch={onGenerateBatch} navigate={navigate} />
+      onGenerateBatch={onGenerateBatch} onPurgeGenerated={onPurgeGenerated} navigate={navigate} />
   );
 
   if (route.startsWith('tickets/view/')) {

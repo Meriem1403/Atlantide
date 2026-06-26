@@ -100,9 +100,16 @@ function buildTicketPage(
   pdf.text(`Valable : ${monthLabel}`, 5, monthY);
 
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(18);
+  pdf.setFontSize(16);
   pdf.setTextColor(67, 97, 238);
-  pdf.text(`${ticket.faceValue.toFixed(2)} EUR`, 5, monthY + 10);
+  pdf.text(`${ticket.faceValue.toFixed(2)} EUR`, 5, monthY + 9);
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(6);
+  pdf.setTextColor(110, 110, 115);
+  const contribution = Math.max(0, ticket.faceValue - ticket.subsidy);
+  pdf.text(`Subvention employeur : ${ticket.subsidy.toFixed(2)} EUR`, 5, monthY + 13);
+  pdf.text(`Reste agent : ${contribution.toFixed(2)} EUR`, 5, monthY + 16.5);
 
   pdf.setDrawColor(200, 200, 200);
   pdf.setLineDashPattern([1, 1], 0);
