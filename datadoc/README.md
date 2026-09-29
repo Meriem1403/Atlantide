@@ -5,7 +5,8 @@ Fichiers ODS importés en base via `npm run import-datadoc`.
 | Fichier | Contenu |
 |---------|---------|
 | `PRESTATAIRES TICKETS REPAS.ods` | Liste des restaurants prestataires (nom, ville, téléphone) |
-| `calcul des tickets repas JUILLET 2026.ods` | Allocations par service et par agent (juillet 2026) |
+| `calcul des tickets repas JUILLET 2026.ods` | Allocations juillet 2026 |
+| `calcul des tickets repas Octobre 2026.ods` | Allocations octobre 2026 (`node migrations/importOctober2026.js`) |
 
 ## Correspondance applicative
 

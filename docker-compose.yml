@@ -44,10 +44,11 @@ services:
       MAIL_FROM: "Tickets Repas <noreply@ticketsrepas.local>"
       ADMIN_NOTIFICATION_EMAIL: compta@mairie.fr
       DATADOC_PATH: /datadoc
-      ORG_NAME: "DIRM Méditerranée"
+      ORG_NAME: "DIRM MÉDITERRANÉE"
     volumes:
       - ./backend/src:/app/src
       - ./backend/migrations:/app/migrations
+      - ./backend/assets:/app/assets
       - ./backend/package.json:/app/package.json
       - ./backend/package-lock.json:/app/package-lock.json
       - ./datadoc:/datadoc:ro
