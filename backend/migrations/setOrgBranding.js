@@ -3,10 +3,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import pool from '../src/config/database.js';
 
-const ORG_NAME = process.env.ORG_NAME || 'DIRM Méditerranée';
+const ORG_NAME = process.env.ORG_NAME || 'DIRM MÉDITERRANÉE';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const candidates = [
+  path.resolve(__dirname, '../../logo.png'),
   path.resolve(__dirname, '../assets/org-logo.png'),
   '/datadoc/org-logo.png',
   path.resolve(__dirname, '../../datadoc/org-logo.png'),
