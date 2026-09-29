@@ -7,3 +7,6 @@ backend/.env
 coverage/
 datadoc/IDENTIFIANTS.md
 Image*.png
+backups/*
+!backups/ticketsrepas-complet.sql
+docker-compose.override.yml
