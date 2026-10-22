@@ -17,7 +17,7 @@ describe('Auth API', () => {
   it('connecte l administrateur', async () => {
     const res = await request(app)
       .post('/api/auth/login')
-      .send({ username: 'admin', password: 'admin123' });
+      .send({ username: 'admin', password: 'change-me' });
     expect(res.status).toBe(200);
     expect(res.body.token).toBeDefined();
     expect(res.body.user.role).toBe('admin');

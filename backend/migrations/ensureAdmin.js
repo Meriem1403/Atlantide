@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 import pool from '../src/config/database.js';
 
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'change-me';
 
 async function main() {
   const existing = await pool.query(`SELECT id FROM users WHERE role = 'admin' LIMIT 1`);

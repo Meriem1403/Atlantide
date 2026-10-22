@@ -138,7 +138,7 @@ export const INITIAL_SUBVENTIONS: SubventionConfig[] = [
 ];
 
 export const INITIAL_USERS: UserAccount[] = [
-  { id: 'u0', username: 'admin', password: 'admin123', role: 'admin', profileId: 'admin', name: 'Service Comptabilité' },
+  { id: 'u0', username: 'admin', password: 'change-me', role: 'admin', profileId: 'admin', name: 'Service Comptabilité' },
   { id: 'u1', username: 'm.dubois', password: 'marie2026', role: 'agent', profileId: 'ag1', name: 'Marie Dubois' },
   { id: 'u2', username: 't.martin', password: 'thomas2026', role: 'agent', profileId: 'ag2', name: 'Thomas Martin' },
   { id: 'u3', username: 's.leroy', password: 'sophie2026', role: 'agent', profileId: 'ag3', name: 'Sophie Leroy' },

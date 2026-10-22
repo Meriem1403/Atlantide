@@ -175,7 +175,7 @@ export function SettingsPage({ orgName, orgLogo, notificationEmail, mailFrom, on
             <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Comptes d'accès</h3>
             <div className="space-y-2">
               {[
-                { role: 'Admin', user: 'admin', pass: 'admin123', color: '#4361EE', bg: '#EEF2FF' },
+                { role: 'Admin', user: 'admin', pass: 'change-me', color: '#4361EE', bg: '#EEF2FF' },
                 { role: 'Agents', user: 'm.dubois, t.martin…', pass: 'marie2026, thomas2026…', color: '#2DC653', bg: '#DCFCE7' },
                 { role: 'Prestataires', user: 'lafourchette, midiexpress', pass: 'prest123, prest456', color: '#D97706', bg: '#FEF3C7' },
               ].map(item => (

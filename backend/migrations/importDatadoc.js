@@ -95,7 +95,7 @@ async function importDatadoc() {
       si += 1;
     }
 
-    const adminHash = await bcrypt.hash('admin123', 10);
+    const adminHash = await bcrypt.hash('change-me', 10);
     await client.query(
       `INSERT INTO users (id, username, password_hash, role, profile_id, name)
        VALUES ('u-admin',$1,$2,'admin','admin','Service Comptabilité DIRM')`,
