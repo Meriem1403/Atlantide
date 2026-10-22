@@ -6,11 +6,6 @@ interface Props {
   onForgotPassword?: () => void;
 }
 
-const ROLE_HINTS = [
-  { role: 'admin', username: 'admin', password: 'change-me', label: 'Administrateur', color: '#4361EE' },
-  { role: 'provider', username: 'contact@labonnefourchette.fr', password: 'prest123', label: 'Prestataire (démo)', color: '#D97706' },
-];
-
 export function LoginPage({ onLogin, onForgotPassword }: Props) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -29,12 +24,6 @@ export function LoginPage({ onLogin, onForgotPassword }: Props) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const quickLogin = (hint: typeof ROLE_HINTS[0]) => {
-    setUsername(hint.username);
-    setPassword(hint.password);
-    setError('');
   };
 
   return (
@@ -160,24 +149,9 @@ export function LoginPage({ onLogin, onForgotPassword }: Props) {
             </form>
           </div>
 
-          <div className="mt-8">
-            <p style={{ fontSize: 12, color: '#9CA3AF', textAlign: 'center', marginBottom: 12, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-              Accès administrateur
-            </p>
-            <div className="grid grid-cols-1 gap-2">
-              {ROLE_HINTS.map(hint => (
-                <button
-                  key={hint.role}
-                  onClick={() => quickLogin(hint)}
-                  className="px-4 py-3 rounded-xl bg-white text-left transition-all hover:shadow-md"
-                  style={{ border: `1px solid ${hint.color}30` }}
-                >
-                  <div style={{ fontSize: 12, fontWeight: 700, color: hint.color }}>{hint.label}</div>
-                  <div style={{ fontSize: 11, color: '#9CA3AF', fontFamily: 'monospace', marginTop: 4 }}>{hint.username}</div>
-                </button>
-              ))}
-            </div>
-          </div>
+          <p style={{ fontSize: 12, color: '#9CA3AF', textAlign: 'center', marginTop: 24, lineHeight: 1.5 }}>
+            Agents : email de la fiche. Prestataires : email du restaurant.
+          </p>
         </div>
       </div>
     </div>

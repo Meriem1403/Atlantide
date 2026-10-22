@@ -64,9 +64,12 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Identifiants incorrects' });
     }
 
-    if (user.setup_token && !user.reset_token) {
+    const setupStillValid = user.setup_token
+      && user.setup_token_expires
+      && new Date(user.setup_token_expires) > new Date();
+    if (setupStillValid && !user.reset_token) {
       return res.status(403).json({
-        error: 'Compte non activé. Utilisez le lien reçu par email pour créer votre mot de passe.',
+        error: 'Compte non activé. Utilisez le lien reçu par email, ou le mot de passe initial fourni par la comptabilité.',
         needsSetup: true,
       });
     }
